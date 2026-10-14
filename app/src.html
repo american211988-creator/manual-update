@@ -56,7 +56,6 @@ p { margin: 0; }
 header.top { display: grid; gap: 12px; }
 .brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
 .brand .org { font-size: 0.8rem; color: var(--accent); font-weight: 600; letter-spacing: 0.04em; }
-.lede { color: var(--muted); max-width: 70ch; }
 
 nav.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 5; }
 nav.tabs button { appearance: none; border: 0; background: none; color: var(--muted); font: 500 0.92rem var(--font-body); padding: 10px 14px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
@@ -147,9 +146,13 @@ pre.mail { margin: 0; white-space: pre-wrap; font: 0.88rem/1.7 var(--font-body);
 .modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--ink) 45%, transparent); }
 .modal .sheet { width: min(100%, 760px); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--del); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; }
 .modal h2 { color: var(--del); }
-.privacy { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; padding: 10px 14px; border: 1px solid var(--del); border-radius: var(--r); background: var(--del-bg); color: var(--ink); max-width: 100%; }
-.privacy .stamp { color: var(--del); background: var(--surface); }
-.privacy p { min-width: 0; flex: 1 1 280px; }
+.notice { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; padding: 10px 14px; border: 1px solid; border-radius: var(--r); color: var(--ink); width: 100%; }
+.notice p { min-width: 0; flex: 1 1 280px; }
+.notice .stamp { background: var(--surface); }
+.notice.intro { border-color: var(--accent); background: var(--accent-weak); }
+.notice.intro .stamp { color: var(--accent); }
+.notice.privacy { border-color: var(--del); background: var(--del-bg); }
+.notice.privacy .stamp { color: var(--del); }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; border-radius: var(--r); font-size: 0.85rem; z-index: 20; max-width: calc(100% - 32px); }
 footer { color: var(--muted); font-size: 0.78rem; }
 @media (prefers-reduced-motion: no-preference) { nav.tabs button, .runs button, .msg { transition: background .15s, border-color .15s, color .15s; } }
@@ -162,8 +165,11 @@ footer { color: var(--muted); font-size: 0.78rem; }
       <span class="org">가나다생명 심사부</span>
       <h1>기준문서 변경관리</h1>
     </div>
-    <p class="lede">사무처리기준·업무매뉴얼·내규 파일을 올리면 문서유형을 분류하고, 신구 버전을 조항 단위로 비교해 변경대비표(조항 | 현행 | 개정 | 변경유형 | 비고)를 만듭니다. 구독 담당자에게 알림을 남기고, 정답표로 정확도를 검증합니다.</p>
-    <div class="privacy" role="note">
+    <div class="notice intro" role="note">
+      <span class="stamp">서비스 안내</span>
+      <p>사무처리기준·업무매뉴얼·내규 파일을 올리면 문서유형을 분류하고, 신구 버전을 조항 단위로 비교해 변경대비표(조항 | 현행 | 개정 | 변경유형 | 비고)를 만듭니다. 구독 담당자에게 알림을 남기고, 정답표로 정확도를 검증합니다.</p>
+    </div>
+    <div class="notice privacy" role="note">
       <span class="stamp">개인정보 보호</span>
       <p><strong>개인정보가 탐지되면 작업이 자동으로 중단됩니다.</strong> 주민등록번호·전화번호·카드번호·계좌번호·여권번호·이메일 등이 들어 있으면 업로드, CSV 교체, 신구 비교, 비고 저장이 진행되지 않습니다. 문서는 가명 처리(예: 담당자A) 후 올려 주세요.</p>
     </div>
