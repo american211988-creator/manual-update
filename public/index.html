@@ -930,7 +930,7 @@ function docxBody(runs) {
     const table = r.changes.length
       ? `<w:tbl><w:tblPr><w:tblW w:w="${W.reduce((a, b) => a + b)}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>${border}</w:tblBorders><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${W.map(w => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>${header}${rows}</w:tbl>`
       : wPara(wRun("변경된 조항이 없습니다.", { color: "7A7368" }));
-    return wPara(wRun("Hana Life 계약심사부 · 변경대비표", { color: "7A7368", sz: 18 }), { pageBreak: idx > 0, after: 60 }) +
+    return wPara(wRun("Hana Life · 변경대비표", { color: "7A7368", sz: 18 }), { pageBreak: idx > 0, after: 60 }) +
       wPara(wRun(`${r.title} 변경대비표`, { b: true, sz: 32 }), { after: 80, keepNext: true }) +
       wPara(wRun(`${r.oldVer} → ${r.newVer} · 시행일 ${r.eff} · 문서유형 ${r.docType} · 변경 ${r.changes.length}건 (개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}) · 변경률 ${pct(r.changes.length / (r.total || 1))}`, { color: "4A453E", sz: 19 }), { after: 200, keepNext: true }) +
       table +
