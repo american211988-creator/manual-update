@@ -251,8 +251,8 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
   <!-- 1. 문서함·분류 -->
   <section class="panel" id="tab-library">
     <div class="drop" id="drop">
-      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx, .pdf 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.<br>주민등록번호·전화번호·카드번호 같은 개인정보가 들어 있으면 업로드를 중단합니다.</p>
-      <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx,.pdf">파일 선택</label>
+      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx, .pdf, .xlsx 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.<br>주민등록번호·전화번호·카드번호 같은 개인정보가 들어 있으면 업로드를 중단합니다.</p>
+      <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx,.pdf,.xlsx">파일 선택</label>
     </div>
     <div class="bar">
       <div><h2>문서함</h2><span class="muted" id="libCount"></span></div>
@@ -474,7 +474,7 @@ function parseDoc(file) {
   const version = (head.match(/\((v[\d.]+)/) || file.name.match(/_(v[\d.]+)/) || [])[1] || meta?.version || "";
   const eff = (head.match(/시행일\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || meta?.effective_date || "";
   const title = meta?.title || (head.match(/\]\s*(.+?)\s*\(v/) || [])[1]
-    || file.name.replace(/\.(txt|docx|pdf)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
+    || file.name.replace(/\.(txt|docx|pdf|xlsx)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
   return { name: file.name, title: norm(title), version, eff, meta, articles, preamble: head, cls: classify(file.name, file.text) };
 }
 
@@ -1147,8 +1147,59 @@ async function readPdf(f) {
   if (!text.replace(/\s/g, "")) throw new Error("글자를 읽을 수 없는 PDF입니다 (스캔 이미지 PDF는 지원하지 않습니다)");
   return text;
 }
+/* 엑셀(.xlsx): 외부 라이브러리 없이 ZIP을 풀어 첫 번째 시트를 읽는다.
+   행마다 칸을 이어 한 줄로 만들고, '제N조 | 제목 | 내용' 구성이면 '제N조(제목) 내용'으로 맞춘다. 그림·도형은 무시한다. */
+async function unzipEntries(buf) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf), dec = new TextDecoder();
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= Math.max(0, u8.length - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  if (eocd < 0) throw new Error("엑셀 파일 구조를 읽을 수 없습니다");
+  const n = dv.getUint16(eocd + 10, true), out = {};
+  for (let i = 0, p = dv.getUint32(eocd + 16, true); i < n; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nl = dv.getUint16(p + 28, true),
+      el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true), lo = dv.getUint32(p + 42, true);
+    const name = dec.decode(u8.subarray(p + 46, p + 46 + nl));
+    out[name] = async () => {
+      const start = lo + 30 + dv.getUint16(lo + 26, true) + dv.getUint16(lo + 28, true), data = u8.subarray(start, start + csize);
+      if (method === 0) return dec.decode(data);
+      if (typeof DecompressionStream === "undefined") throw new Error("이 브라우저는 엑셀 파일을 읽을 수 없습니다 (최신 브라우저를 쓰세요)");
+      return new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+    };
+    p += 46 + nl + el + cl;
+  }
+  return out;
+}
+async function readXlsx(f) {
+  const z = await unzipEntries(await f.arrayBuffer()), xml = async n => z[n] ? new DOMParser().parseFromString(await z[n](), "application/xml") : null;
+  const all = (doc, tag) => [...doc.getElementsByTagNameNS("*", tag)];
+  const wb = await xml("xl/workbook.xml"), rels = await xml("xl/_rels/workbook.xml.rels");
+  const first = wb && all(wb, "sheet")[0];
+  const rid = first && (first.getAttribute("r:id") || first.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id"));
+  const target = rels && all(rels, "Relationship").find(r => r.getAttribute("Id") === rid)?.getAttribute("Target");
+  const sheetPath = target ? (target.startsWith("/") ? target.slice(1) : "xl/" + target.replace(/^\.\//, "")) : "xl/worksheets/sheet1.xml";
+  const sst = await xml("xl/sharedStrings.xml");
+  const shared = sst ? all(sst, "si").map(si => all(si, "t").map(t => t.textContent).join("")) : [];
+  const sheet = await xml(sheetPath);
+  if (!sheet) throw new Error("엑셀의 첫 번째 시트를 찾지 못했습니다");
+  const colNum = ref => [...ref.replace(/\d+/g, "")].reduce((a, ch) => a * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+  const lines = all(sheet, "row").map(row => {
+    const cells = [];
+    all(row, "c").forEach((c, i) => {
+      const t = c.getAttribute("t"), v = all(c, "v")[0]?.textContent ?? "";
+      const val = t === "s" ? shared[+v] ?? "" : t === "inlineStr" ? all(c, "t").map(x => x.textContent).join("") : v;
+      cells[c.getAttribute("r") ? colNum(c.getAttribute("r")) : i] = String(val).replace(/\s*\n\s*/g, " ").trim();
+    });
+    const vals = cells.filter(v => v);
+    if (vals[0] && /^제\s*\d+\s*조(\s*의\s*\d+)?$/.test(vals[0]) && vals.length >= 3 && !/^\(.*\)$/.test(vals[1]))
+      return `${vals[0]}(${vals[1]}) ${vals.slice(2).join(" ")}`;
+    return vals.join(" ");
+  }).filter(Boolean);
+  if (!lines.length) throw new Error("엑셀 첫 번째 시트에 글자가 없습니다");
+  return lines.join("\n");
+}
 async function readFile(f) {
   if (/\.pdf$/i.test(f.name)) return readPdf(f);
+  if (/\.xlsx$/i.test(f.name)) return readXlsx(f);
   if (/\.docx$/i.test(f.name)) {
     if (!window.mammoth) throw new Error("docx 모듈을 불러오지 못했습니다");
     const { value } = await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() });
@@ -1161,7 +1212,7 @@ async function readFile(f) {
 async function addFiles(files) {
   const ready = [], skipped = [];
   for (const f of files) {
-    if (!/\.(txt|docx|pdf)$/i.test(f.name)) { skipped.push(`${f.name}: .txt, .docx, .pdf만 올릴 수 있습니다`); continue; }
+    if (!/\.(txt|docx|pdf|xlsx)$/i.test(f.name)) { skipped.push(`${f.name}: .txt, .docx, .pdf, .xlsx만 올릴 수 있습니다`); continue; }
     // Mac은 한글 파일 이름을 자모로 풀어(NFD) 넘기므로 완성형(NFC)으로 맞춘다
     try { ready.push({ name: f.name.normalize("NFC"), text: (await readFile(f)).normalize("NFC") }); }
     catch (e) { skipped.push(`${f.name}: ${e.message}`); }
