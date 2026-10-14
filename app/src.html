@@ -167,7 +167,7 @@ h2 { font-size: 1.12rem; }
 .lcd { background: var(--lcd); color: var(--lcd-fg); border-radius: 18px; padding: 16px 20px 12px; display: grid; gap: 6px; box-shadow: inset 0 2px 6px var(--cap-shadow), 0 0 0 1.5px var(--line), 0 0 0 6px var(--k-white), 0 0 0 7.5px var(--line); margin: 8px 8px 6px; }
 .lcd h1 { font-size: clamp(1.35rem, 3.2vw, 1.9rem); line-height: 1.25; color: var(--lcd-fg); }
 .lcd-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: var(--font-lcd); font-size: 1.15rem; letter-spacing: 0.06em; color: var(--lcd-dim); }
-.lcd-org { text-transform: uppercase; }
+.lcd-org { letter-spacing: 0.04em; }
 .lcd-foot #lcdRight { color: var(--led); }
 .led { width: 10px; height: 10px; border-radius: 50%; background: var(--led); box-shadow: 0 0 8px var(--led); flex: none; }
 .cursor { color: var(--lcd-dim); margin-left: 4px; font-family: var(--font-lcd); }
@@ -211,7 +211,7 @@ th { background: var(--paper); }
 select, input[type=number], input[type=text] { border-radius: 8px; border-width: 1.5px; }
 
 .notice { border-radius: 14px; border-width: 1.5px; }
-.notice.intro { border-color: var(--line); background: var(--k-lilac); }
+.notice.intro { border-color: var(--ring); background: var(--k-lilac); }
 .notice.intro .stamp { color: var(--ring); }
 .notice.privacy { background: var(--del-bg); }
 .modal .sheet { border-radius: 18px; border-width: 1.5px; border-top-width: 6px; }
@@ -222,7 +222,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
 <div class="wrap">
   <header class="top">
     <div class="lcd">
-      <div class="lcd-row"><span class="lcd-org">GANADA LIFE · 심사부</span><span class="led" aria-hidden="true"></span></div>
+      <div class="lcd-row"><span class="lcd-org">Hana Life · 계약심사부</span><span class="led" aria-hidden="true"></span></div>
       <h1>기준문서 변경관리<span class="cursor" aria-hidden="true">_</span></h1>
       <div class="lcd-row lcd-foot"><span id="lcdLeft">P1</span><span id="lcdRight">0</span></div>
     </div>
@@ -231,7 +231,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
       <p>사무처리기준·업무매뉴얼·내규 파일을 올리면 문서유형을 분류하고, 신구 버전을 조항 단위로 비교해 변경대비표(조항 | 현행 | 개정 | 변경유형 | 비고)를 만듭니다. 구독 담당자에게 알림을 남기고, 정답표로 정확도를 검증합니다.</p>
     </div>
     <div class="notice privacy" role="note">
-      <span class="stamp">개인정보 보호</span>
+      <span class="stamp">개인정보보호</span>
       <p><strong>개인정보가 탐지되면 작업이 자동으로 중단됩니다.</strong> 주민등록번호·전화번호·카드번호·계좌번호·여권번호·이메일 등이 들어 있으면 업로드, CSV 교체, 신구 비교, 비고 저장이 진행되지 않습니다. 문서는 가명 처리(예: 담당자A) 후 올려 주세요.</p>
     </div>
     <nav class="tabs" role="tablist" id="tabs">
