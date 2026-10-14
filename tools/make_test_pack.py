@@ -283,8 +283,8 @@ def apply(old, chg):
 def body(a, tables):
     text = " ".join(a[3])
     t = tables.get(key(a))
-    if t:
-        text += " " + " ".join(c for row in t for c in row)
+    if t:   # 앱은 Word 표를 '[표] 칸 | 칸 / 칸 | 칸 [/표]'로 읽는다
+        text += " [표] " + " / ".join(" | ".join(row) for row in t) + " [/표]"
     return text
 
 
