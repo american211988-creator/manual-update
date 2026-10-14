@@ -113,6 +113,9 @@ ins { background: var(--new-bg); color: var(--new); text-decoration: none; font-
 .group { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .group:last-child { border-bottom: 0; }
 .group .files { display: flex; flex-wrap: wrap; gap: 6px; }
+.grp-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: flex-end; }
+.grp-actions .muted { font-size: 0.8rem; }
+button.btn.danger { border-color: var(--del); color: var(--del); }
 .file { font: 0.78rem var(--font-data); padding: 2px 8px; border-radius: 3px; background: var(--paper); border: 1px solid var(--line); }
 .kw { font-size: 0.78rem; color: var(--muted); }
 @media (max-width: 560px) { .group { grid-template-columns: minmax(0, 1fr); } }
@@ -227,6 +230,8 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
 .notice.intro { border-color: var(--ring); background: var(--k-lilac); }
 .notice.intro .stamp { color: var(--ring); }
 .notice.privacy { background: var(--del-bg); }
+.notice.warnbox { background: var(--rev-bg); border-color: var(--rev); align-items: center; }
+.notice.warnbox .stamp { color: var(--rev); }
 .modal .sheet { border-radius: 18px; border-width: 1.5px; border-top-width: 6px; }
 .toast { border-radius: 10px; }
 </style>
@@ -242,6 +247,11 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
     <div class="notice intro" role="note">
       <span class="stamp">서비스 안내</span>
       <p>사무처리기준·업무매뉴얼·내규 파일을 올리면 문서유형을 분류하고, 신구 버전을 조항 단위로 비교해 변경대비표(조항 | 현행 | 개정 | 변경유형 | 비고)를 만듭니다. 구독 담당자에게 알림을 남기고, 정답표로 정확도를 검증합니다.</p>
+    </div>
+    <div class="notice warnbox" id="storageWarn" role="alert" hidden>
+      <span class="stamp">저장 실패</span>
+      <p><strong id="storageWarnMsg"></strong> 문서함에서 쓰지 않는 파일을 빼거나 변경대비표에서 오래된 비교 결과를 지운 뒤 ‘다시 저장’을 누르세요. 저장 사용량은 ‘기준 데이터’ 탭에서 볼 수 있습니다.</p>
+      <button class="btn small" id="retrySave" type="button">다시 저장</button>
     </div>
     <div class="notice privacy" role="note">
       <span class="stamp">개인정보보호</span>
@@ -431,7 +441,7 @@ const state = {
   library: [],      // {name, text, uploaded}
   runs: [],         // 비교 결과
   notices: [],      // 알림
-  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null, noteDrafts: {},
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null, noteDrafts: {}, confirmRemove: null, storageError: false,
 };
 function loadRef() {
   state.docsMeta = parseCSV(SAMPLE.csv.documents);
@@ -440,17 +450,71 @@ function loadRef() {
   state.expected = parseCSV(SAMPLE.csv.expected_changes);
   state.history = parseCSV(SAMPLE.csv.change_history || "");
 }
-function save() {
-  try {
-    localStorage.setItem(STORE_KEY, JSON.stringify({
-      library: state.library.filter(f => f.uploaded), runs: state.runs, notices: state.notices,
-      users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta, history: state.history,
-    }));
-  } catch (e) { /* 저장 불가 환경: 무시 */ }
+/* 작업 내용 저장: 두 곳에 쓴다.
+   - localStorage: 즉시(동기) 기록 → 저장 직후 새로고침해도 남는다. 다만 약 5MB까지만 담긴다.
+   - IndexedDB: 용량이 큰 저장소에 곧바로 이어서 기록 → localStorage가 넘쳐도 작업이 남는다.
+   불러올 때는 둘 중 더 최근 저장본을 쓴다. 둘 다 실패하면 화면 위에 경고를 띄운다.
+   (예전에는 localStorage만 써서 용량을 넘으면 아무 경고 없이 저장되지 않았다.) */
+const IDB_NAME = "hana-manual-update", IDB_STORE = "kv";
+let idbPromise = null;
+function idb() {
+  if (!idbPromise) idbPromise = new Promise((ok, no) => {
+    try {
+      const r = indexedDB.open(IDB_NAME, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore(IDB_STORE);
+      r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error);
+    } catch (e) { no(e); }
+  }).catch(e => { idbPromise = null; throw e; });
+  return idbPromise;
 }
-function restore() {
+async function idbReq(mode, fn) {
+  const db = await idb();
+  return new Promise((ok, no) => {
+    const tx = db.transaction(IDB_STORE, mode), req = fn(tx.objectStore(IDB_STORE));
+    tx.oncomplete = () => ok(req.result); tx.onerror = tx.onabort = () => no(tx.error || req.error);
+  });
+}
+const idbGet = k => idbReq("readonly", st => st.get(k));
+const idbSet = (k, v) => idbReq("readwrite", st => st.put(v, k));
+function snapshot() {
+  return {
+    savedAt: Date.now(), library: state.library.filter(f => f.uploaded), runs: state.runs, notices: state.notices,
+    users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta, history: state.history,
+  };
+}
+let saveTimer = null, lsOk = true;
+function save() {
+  const data = snapshot();
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); lsOk = true; }
+  catch (e) { lsOk = e; try { localStorage.removeItem(STORE_KEY); } catch (e2) {} }   // 넘친 옛 저장본이 남아 새 내용을 덮지 않게 지운다
+  clearTimeout(saveTimer); saveTimer = setTimeout(() => flushIdb(data), 30);
+  if (lsOk === true) setStorageWarn(null);
+}
+async function flushIdb(data) {
+  saveTimer = null;
+  try { await idbSet(STORE_KEY, data || snapshot()); return setStorageWarn(null); }
+  catch (e) { return lsOk === true ? setStorageWarn(null) : setStorageWarn(lsOk || e); }
+}
+async function flushSave() { save(); clearTimeout(saveTimer); return flushIdb(); }
+function setStorageWarn(err) {
+  const box = $("#storageWarn");
+  if (box) box.hidden = !err;
+  state.storageError = !!err;
+  if (err) $("#storageWarnMsg").textContent = /quota/i.test(String(err?.name || err)) || err?.code === 22
+    ? "브라우저 저장 공간이 부족해 마지막 작업이 이 브라우저에 저장되지 않았습니다. 이대로 새로고침하거나 창을 닫으면 저장 안 된 내용이 사라집니다."
+    : "이 브라우저에서 작업 내용을 저장하지 못했습니다(사생활 보호 창이거나 저장이 막혀 있을 수 있습니다). 새로고침하면 저장 안 된 내용이 사라집니다.";
+  return !err;
+}
+addEventListener("pagehide", () => { if (saveTimer) { clearTimeout(saveTimer); flushIdb(); } });
+async function loadStored() {
+  let fromIdb = null, fromLs = null;
+  try { fromIdb = await idbGet(STORE_KEY); } catch (e) {}
+  try { fromLs = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) {}
+  if (fromIdb && fromLs) return (fromLs.savedAt || 0) > (fromIdb.savedAt || 0) ? fromLs : fromIdb;
+  return fromIdb || fromLs;
+}
+function restore(d) {
   try {
-    const d = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (!d) return false;
     Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
     ["users", "keywords", "expected", "docsMeta", "history"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
@@ -514,13 +578,16 @@ function groupLibrary() {
   }
   // 같은 문서·같은 버전 파일이 여러 개면(예: txt와 pdf) 가장 나중에 올린 파일만 쓴다
   const out = [...groups.values()].map(list => {
+    const allNames = list.map(d => d.name);
     const byVer = new Map();
     list.forEach(d => { const k = d.version || d.name; if (byVer.has(k)) d.replaces = byVer.get(k).name; byVer.set(k, d); });
-    return [...byVer.values()].sort((a, b) => versionNum(a.version) - versionNum(b.version));
+    const g = [...byVer.values()].sort((a, b) => versionNum(a.version) - versionNum(b.version));
+    g.allNames = allNames;
+    return g;
   });
   // 최근에 올린 파일이 있는 문서를 맨 위로 (샘플은 원래 순서대로 아래)
   const latest = g => Math.max(0, ...g.map(d => d.addedAt || 0));
-  return out.map((g, i) => [g, i]).sort((a, b) => latest(b[0]) - latest(a[0]) || a[1] - b[1]).map(([g]) => g);
+  return out.map((g, i) => [g, i]).sort((a, b) => latest(b[0]) - latest(a[0]) || a[1] - b[1]).map(([g]) => g);   // 정렬 후에도 allNames 유지
 }
 
 /* ---------- 비교 ---------- */
@@ -813,9 +880,24 @@ function renderLibrary() {
         <div class="files">${list.map(d => `<span class="file">${esc(d.name)}${d.version ? " · " + esc(d.version) : ""}${d.articles.length ? ` · ${d.articles.length}개 조항` : ""}${d.replaces ? ` · 같은 버전 ${esc(d.replaces)} 대신 사용` : ""}</span>`).join("")}</div>
         <p class="kw">${last.cls.hits.length ? "분류 근거 키워드: " + last.cls.hits.map(esc).join(", ") : "일치하는 분류 키워드가 없어 미분류로 둡니다."}${!pair && last.articles.length ? " · 비교할 다른 버전이 없습니다." : ""}${!last.articles.length ? " · 조항(제N조) 구조가 없어 비교 대상에서 제외합니다." : ""}</p>
       </div>
-      <div>${pair ? `<button class="btn ${run ? "" : "primary"}" data-run="${gi}">${run ? "대비표 보기" : `${esc(list[list.length - 2].version)} → ${esc(last.version)} 비교`}</button>` : ""}</div>
+      <div class="grp-actions">${pair ? `<button class="btn ${run ? "" : "primary"}" data-run="${gi}">${run ? "대비표 보기" : `${esc(list[list.length - 2].version)} → ${esc(last.version)} 비교`}</button>` : ""}${(() => {
+        const up = (list.allNames || []).filter(n => state.library.some(f => f.uploaded && f.name === n));
+        if (!up.length) return "";
+        return state.confirmRemove === gi
+          ? `<span class="muted">올린 파일 ${up.length}개를 문서함에서 뺍니다. 비교 결과는 남습니다.</span><button class="btn small" data-rm-cancel="1">취소</button><button class="btn small danger" data-rm-yes="${gi}">빼기</button>`
+          : `<button class="btn small" data-rm="${gi}">문서함에서 빼기</button>`;
+      })()}</div>
     </div>`;
   }).join("") || `<p class="muted">아직 문서가 없습니다. 위에서 파일을 올려 주세요.</p>`;
+  // 공간 정리: 올린 파일을 문서함에서 뺀다 (두 번 확인, 샘플 파일은 그대로)
+  $("#groups").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => { state.confirmRemove = +b.dataset.rm; renderLibrary(); });
+  $("#groups").querySelectorAll("[data-rm-cancel]").forEach(b => b.onclick = () => { state.confirmRemove = null; renderLibrary(); });
+  $("#groups").querySelectorAll("[data-rm-yes]").forEach(b => b.onclick = () => {
+    const names = new Set(groups[+b.dataset.rmYes].allNames || []);
+    const n = state.library.filter(f => f.uploaded && names.has(f.name)).length;
+    state.library = state.library.filter(f => !(f.uploaded && names.has(f.name)));
+    state.confirmRemove = null; save(); renderAll(); toast(`올린 파일 ${n}개를 문서함에서 뺐습니다`);
+  });
   $("#groups").querySelectorAll("[data-run]").forEach(b => b.onclick = () => {
     const list = groups[+b.dataset.run];
     const existing = state.runs.find(r => r.newName === list[list.length - 1].name && r.oldName === list[list.length - 2].name);
@@ -1069,7 +1151,16 @@ function renderStats() {
   if ($("#histToggle")) $("#histToggle").onchange = e => { state.showHistory = e.target.checked; renderStats(); };
 }
 
+async function renderStorageUsage() {
+  const el = $("#storageUsage"); if (!el) return;
+  const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + "MB";
+  const up = state.library.filter(f => f.uploaded).length;
+  let line = `올린 파일 ${up}개 · 비교 결과 ${state.runs.length}건 · 알림 ${state.notices.length}건`;
+  try { const e = await navigator.storage?.estimate?.(); if (e?.quota) line += ` · 브라우저 저장 사용량 ${mb(e.usage || 0)} / 약 ${mb(e.quota)}`; } catch (err) {}
+  el.textContent = line + (state.storageError ? " · 마지막 저장 실패" : "") + ". 작업 내용은 이 브라우저에만 저장됩니다.";
+}
 function renderRef() {
+  setTimeout(renderStorageUsage, 0);
   const tbl = (title, rows, cols) => `<div class="box"><h2>${title}</h2><div class="scroll"><table>
     <thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
     <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(c === "subscribed_types" ? (r[c] || "").split("|").join(", ") : r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
@@ -1080,6 +1171,8 @@ function renderRef() {
     tbl("문서 메타", state.docsMeta, ["doc_id", "title", "doc_type", "version", "effective_date", "owner_name"]) +
     `<div class="box"><h2>정답표</h2><p>${state.expected.length}건 · 개정 ${state.expected.filter(e => e.change_type === "개정").length} · 신설 ${state.expected.filter(e => e.change_type === "신설").length} · 삭제 ${state.expected.filter(e => e.change_type === "삭제").length}</p>
      <p class="muted">‘정답 검증’ 탭에서 비교 결과와 대조합니다.</p>
+     <h3>저장 공간</h3>
+     <p id="storageUsage" class="muted">사용량을 확인하는 중…</p>
      <h3>개인정보 탐지 규칙</h3>
      <p class="muted">업로드·CSV 교체·비교 실행·비고 저장 전에 검사하고, 하나라도 나오면 작업을 멈춥니다. 담당자 CSV의 이메일과 example.com 같은 예시 도메인은 제외합니다.</p>
      <div class="scroll"><table><thead><tr><th>항목</th><th>예시 형식</th></tr></thead><tbody>${PII_RULES.map(r => `<tr><td>${esc(r.label)}</td><td class="mono">${esc(PII_EXAMPLES[r.label])}</td></tr>`).join("")}</tbody></table></div>
@@ -1488,6 +1581,7 @@ $("#resetBtn").onclick = () => { boot(true); toast("샘플 데이터로 되돌�
 $("#readAllBtn").onclick = () => { state.notices.forEach(n => { if (state.userFilter === "all" || n.userId === state.userFilter) n.read = true; }); save(); renderInbox(); };
 $("#userFilter").onchange = e => { state.userFilter = e.target.value; state.currentMsg = null; renderInbox(); };
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$("#retrySave").onclick = async () => { clearTimeout(saveTimer); if (await flushSave()) toast("저장했습니다"); else toast("아직 저장 공간이 부족합니다. 파일이나 비교 결과를 더 지워 주세요."); renderRef(); };
 $("#piiClose").onclick = () => { $("#piiModal").hidden = true; };
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#piiModal").hidden = true; });
 
@@ -1502,22 +1596,24 @@ Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange =
 });
 
 /* ---------- 시작 ---------- */
-function boot(reset) {
+async function boot(reset) {
   loadRef();
   state.runs = []; state.notices = []; state.currentRun = null; state.currentMsg = null; state.noteDrafts = {};
   state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false }));
-  if (reset || !restore()) {
+  if (reset || !restore(await loadStored())) {
     if (reset) { loadRef(); state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })); }
     runGroups(groupLibrary());   // 처음 열면 샘플 3세트를 바로 비교해 둔다
     save();
   }
   renderAll();
 }
-boot(false);
-let startTab = "library";
-try { startTab = localStorage.getItem(STORE_KEY + ":tab") || startTab; } catch (e) {}
-if (/^#(library|changes|verify|inbox|stats|ref)$/.test(location.hash)) startTab = location.hash.slice(1);
-setTab(startTab);
+boot(false).then(() => {
+  let startTab = "library";
+  try { startTab = localStorage.getItem(STORE_KEY + ":tab") || startTab; } catch (e) {}
+  if (/^#(library|changes|verify|inbox|stats|ref)$/.test(location.hash)) startTab = location.hash.slice(1);
+  setTab(startTab);
+  try { navigator.storage?.persist?.(); } catch (e) {}   // 브라우저가 공간 정리 때 임의로 지우지 않도록 요청 (거절돼도 무방)
+});
 </script>
 </body>
 </html>
