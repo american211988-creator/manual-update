@@ -1,0 +1,6 @@
+﻿user_id,name,team,email,subscribed_types
+U01,담당자A,심사1팀,a@example.com,사무처리기준|내규
+U02,담당자B,심사1팀,b@example.com,업무매뉴얼
+U03,담당자C,심사2팀,c@example.com,내규|업무매뉴얼
+U04,담당자D,심사2팀,d@example.com,사무처리기준
+U05,팀장E,심사부,e@example.com,사무처리기준|업무매뉴얼|내규
