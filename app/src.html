@@ -144,6 +144,9 @@ pre.mail { margin: 0; white-space: pre-wrap; font: 0.88rem/1.7 var(--font-body);
 .calc label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
 .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
 
+.modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--ink) 45%, transparent); }
+.modal .sheet { width: min(100%, 760px); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--del); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; }
+.modal h2 { color: var(--del); }
 .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; border-radius: var(--r); font-size: 0.85rem; z-index: 20; max-width: calc(100% - 32px); }
 footer { color: var(--muted); font-size: 0.78rem; }
 @media (prefers-reduced-motion: no-preference) { nav.tabs button, .runs button, .msg { transition: background .15s, border-color .15s, color .15s; } }
@@ -170,7 +173,7 @@ footer { color: var(--muted); font-size: 0.78rem; }
   <!-- 1. 문서함·분류 -->
   <section class="panel" id="tab-library">
     <div class="drop" id="drop">
-      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.</p>
+      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.<br>주민등록번호·전화번호·카드번호 같은 개인정보가 들어 있으면 업로드를 중단합니다.</p>
       <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx">파일 선택</label>
     </div>
     <div class="bar">
@@ -238,6 +241,18 @@ footer { color: var(--muted); font-size: 0.78rem; }
   <footer>모든 회사명·담당자·금액은 가상 데이터입니다. 작업 내용은 이 브라우저에만 저장됩니다.</footer>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="modal" id="piiModal" role="alertdialog" aria-modal="true" aria-labelledby="piiTitle" hidden>
+  <div class="sheet">
+    <h2 id="piiTitle"></h2>
+    <p id="piiLead"></p>
+    <div class="scroll"><table>
+      <thead><tr><th>대상</th><th>항목</th><th>위치</th><th>탐지 값 (가림 처리)</th></tr></thead>
+      <tbody id="piiRows"></tbody>
+    </table></div>
+    <p class="muted">해당 내용을 지우거나 가명(예: 담당자A, 010-0000-0000) 처리한 뒤 다시 시도하세요. 탐지된 원문은 저장하지 않았습니다.</p>
+    <div><button class="btn primary" id="piiClose">확인</button></div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
@@ -269,6 +284,50 @@ function parseCSV(text) {
   if (f !== "" || row.length) { row.push(f); rows.push(row); }
   const [head, ...body] = rows.filter(r => r.some(v => v.trim() !== ""));
   return body.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? "").trim()])));
+}
+
+/* ---------- 개인정보 탐지 ---------- */
+const luhn = d => { let sum = 0; [...d].reverse().forEach((c, i) => { let n = +c; if (i % 2) { n *= 2; if (n > 9) n -= 9; } sum += n; }); return sum % 10 === 0; };
+const RESERVED_MAIL = /@(?:[\w-]+\.)*(?:example\.(?:com|net|org)|example|test|invalid|localhost)$/i;
+const PII_RULES = [
+  { label: "주민등록번호·외국인등록번호", re: /(?<!\d)(\d{2})(\d{2})(\d{2})\s?-?\s?[1-8]\d{6}(?!\d)/g, ok: m => +m[2] >= 1 && +m[2] <= 12 && +m[3] >= 1 && +m[3] <= 31 },
+  { label: "카드번호", re: /(?<!\d)(?:\d{4}[-\s]?){3}\d{4}(?!\d)/g, ok: m => luhn(m[0].replace(/\D/g, "")) },
+  { label: "운전면허번호", re: /(?<!\d)\d{2}-\d{2}-\d{6}-\d{2}(?!\d)/g },
+  { label: "휴대전화번호", re: /(?<!\d)01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}(?!\d)/g },
+  { label: "유선전화번호", re: /(?<!\d)0(?:2|[3-6][1-5]|70)[-.)\s]\d{3,4}[-.\s]\d{4}(?!\d)/g },
+  { label: "계좌번호", re: /(?:계좌|입금|송금)[^\n\d]{0,15}(\d{2,6}-\d{2,6}-\d{2,8}(?:-\d{1,3})?)/g, grp: 1 },
+  { label: "여권번호", re: /여권[^\n]{0,15}?\b([MSRODG]\d{8}|[MSRODG]\d{3}[A-Z]\d{4})\b/g, grp: 1 },
+  { label: "이메일 주소", re: /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, ok: (m, o) => !o.allowEmail && !RESERVED_MAIL.test(m[0]) },
+];
+const PII_EXAMPLES = { "주민등록번호·외국인등록번호": "900101-1234567", "카드번호": "4111-1111-1111-1111", "운전면허번호": "11-12-123456-78", "휴대전화번호": "010-1234-5678", "유선전화번호": "02-123-4567", "계좌번호": "계좌 123-456-789012", "여권번호": "여권 M12345678", "이메일 주소": "hong@company.co.kr" };
+function maskPII(v) {
+  if (v.includes("@")) { const [id, dom] = v.split("@"); return id[0] + "***@" + dom; }
+  const n = (v.match(/[0-9A-Za-z]/g) || []).length; let i = 0;
+  return v.replace(/[0-9A-Za-z]/g, c => (i++ < 3 || i > n - 2) ? c : "*");
+}
+function scanPII(text, opts = {}) {
+  const found = [], taken = [];
+  for (const r of PII_RULES) {
+    for (const m of String(text).matchAll(r.re)) {
+      if (r.ok && !r.ok(m, opts)) continue;
+      const v = r.grp ? m[r.grp] : m[0];
+      const start = m.index + (r.grp ? m[0].indexOf(v) : 0), end = start + v.length;
+      if (taken.some(([a, b]) => start < b && end > a)) continue;
+      taken.push([start, end]);
+      found.push({ label: r.label, line: String(text).slice(0, start).split("\n").length, masked: maskPII(v) });
+    }
+  }
+  return found;
+}
+/* items: [{source, findings}] — 하나라도 있으면 안내창을 띄우고 true(중단)를 돌려준다 */
+function blockIfPII(action, items) {
+  const hits = items.filter(x => x.findings.length);
+  if (!hits.length) return false;
+  $("#piiTitle").textContent = `개인정보가 탐지되어 ${action}을(를) 중단했습니다`;
+  $("#piiLead").textContent = `${hits.length}개 대상에서 ${hits.reduce((a, x) => a + x.findings.length, 0)}건이 탐지되었습니다. 아무것도 반영하지 않았습니다.`;
+  $("#piiRows").innerHTML = hits.flatMap(x => x.findings.map(f => `<tr><td class="mono">${esc(x.source)}</td><td>${esc(f.label)}</td><td class="num">${f.line ? f.line + "행" : "—"}</td><td class="mono">${esc(f.masked)}</td></tr>`)).join("");
+  $("#piiModal").hidden = false; $("#piiClose").focus();
+  return true;
 }
 
 /* ---------- 상태 ---------- */
@@ -411,6 +470,7 @@ function baseDocId(newDoc) {
   return (newDoc.meta?.doc_id || "").replace(/-\d+$/, "") || "UPL-" + tight(newDoc.title).slice(0, 12);
 }
 
+function groupPII(list) { return list.slice(-2).map(d => ({ source: d.name, findings: scanPII(d.preamble + "\n" + d.articles.map(a => a.title + " " + a.body).join("\n")) })); }
 function runGroup(list) {
   if (list.length < 2) return null;
   const oldDoc = list[list.length - 2], newDoc = list[list.length - 1];
@@ -505,6 +565,7 @@ function renderLibrary() {
   $("#groups").querySelectorAll("[data-run]").forEach(b => b.onclick = () => {
     const list = groups[+b.dataset.run];
     const existing = state.runs.find(r => r.newName === list[list.length - 1].name && r.oldName === list[list.length - 2].name);
+    if (!existing && blockIfPII("비교 작업", groupPII(list))) return;
     const run = existing || runGroup(list);
     state.currentRun = run.id; save(); renderAll(); setTab("changes");
   });
@@ -544,7 +605,11 @@ function renderChanges() {
       </table></div>
       <p class="muted">원본: <span class="mono">${esc(r.oldName)}</span> → <span class="mono">${esc(r.newName)}</span> · 감지 ${esc(r.detectedAt)}${r.owner ? " · 문서 담당 " + esc(r.owner) : ""}</p>
     </div>`;
-  el.querySelectorAll("td.note input").forEach(inp => inp.onchange = () => { r.changes[+inp.dataset.i].note = inp.value; save(); });
+  el.querySelectorAll("td.note input").forEach(inp => inp.onchange = () => {
+    const x = r.changes[+inp.dataset.i];
+    if (blockIfPII("비고 저장", [{ source: x.section + " 비고", findings: scanPII(inp.value) }])) { inp.value = x.note; return; }
+    x.note = inp.value; save();
+  });
 }
 
 function renderUnified() {
@@ -667,6 +732,9 @@ function renderRef() {
     tbl("문서 메타", state.docsMeta, ["doc_id", "title", "doc_type", "version", "effective_date", "owner_name"]) +
     `<div class="box"><h2>정답표</h2><p>${state.expected.length}건 · 개정 ${state.expected.filter(e => e.change_type === "개정").length} · 신설 ${state.expected.filter(e => e.change_type === "신설").length} · 삭제 ${state.expected.filter(e => e.change_type === "삭제").length}</p>
      <p class="muted">‘정답 검증’ 탭에서 비교 결과와 대조합니다.</p>
+     <h3>개인정보 탐지 규칙</h3>
+     <p class="muted">업로드·CSV 교체·비교 실행·비고 저장 전에 검사하고, 하나라도 나오면 작업을 멈춥니다. 담당자 CSV의 이메일과 example.com 같은 예시 도메인은 제외합니다.</p>
+     <div class="scroll"><table><thead><tr><th>항목</th><th>예시 형식</th></tr></thead><tbody>${PII_RULES.map(r => `<tr><td>${esc(r.label)}</td><td class="mono">${esc(PII_EXAMPLES[r.label])}</td></tr>`).join("")}</tbody></table></div>
      <h3>알림 메일 샘플</h3>${SAMPLE.mails.map(m => `<pre class="mail">${esc(m.text.trim())}</pre>`).join("")}</div>`;
 }
 
@@ -723,15 +791,16 @@ async function readFile(f) {
   catch (e) { return new TextDecoder("euc-kr").decode(buf); }
 }
 async function addFiles(files) {
-  let n = 0;
+  const ready = [];
   for (const f of files) {
     if (!/\.(txt|docx)$/i.test(f.name)) { toast(`${f.name}: .txt 또는 .docx만 올릴 수 있습니다`); continue; }
-    try {
-      const text = await readFile(f);
-      state.library = state.library.filter(x => x.name !== f.name).concat({ name: f.name, text, uploaded: true }); n++;
-    } catch (e) { toast(`${f.name}: ${e.message}`); }
+    try { ready.push({ name: f.name, text: await readFile(f) }); }
+    catch (e) { toast(`${f.name}: ${e.message}`); }
   }
-  if (n) { save(); renderAll(); toast(`${n}개 파일을 문서함에 추가했습니다`); }
+  // 개인정보가 한 파일이라도 있으면 이번 업로드 전체를 반영하지 않는다
+  if (blockIfPII("업로드", ready.map(f => ({ source: f.name, findings: [...scanPII(f.name).map(x => ({ ...x, line: 0 })), ...scanPII(f.text)] })))) return;
+  for (const f of ready) state.library = state.library.filter(x => x.name !== f.name).concat({ ...f, uploaded: true });
+  if (ready.length) { save(); renderAll(); toast(`${ready.length}개 파일을 문서함에 추가했습니다`); }
 }
 $("#fileInput").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
 const drop = $("#drop");
@@ -740,7 +809,9 @@ drop.ondragleave = () => drop.classList.remove("over");
 drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); addFiles([...e.dataTransfer.files]); };
 
 $("#runAllBtn").onclick = () => {
-  const done = groupLibrary().map(runGroup).filter(Boolean);
+  const groups = groupLibrary().filter(g => g.length >= 2);
+  if (blockIfPII("비교 작업", groups.flatMap(groupPII))) return;
+  const done = groups.map(runGroup).filter(Boolean);
   state.currentRun = done[0]?.id || null; save(); renderAll();
   toast(`${done.length}개 문서를 비교했습니다 · 변경 ${done.reduce((a, r) => a + r.changes.length, 0)}건`);
   setTab("changes");
@@ -749,11 +820,15 @@ $("#resetBtn").onclick = () => { boot(true); toast("샘플 데이터로 되돌�
 $("#readAllBtn").onclick = () => { state.notices.forEach(n => { if (state.userFilter === "all" || n.userId === state.userFilter) n.read = true; }); save(); renderInbox(); };
 $("#userFilter").onchange = e => { state.userFilter = e.target.value; state.currentMsg = null; renderInbox(); };
 document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+$("#piiClose").onclick = () => { $("#piiModal").hidden = true; };
+document.addEventListener("keydown", e => { if (e.key === "Escape") $("#piiModal").hidden = true; });
 
 const csvTargets = { csvUsers: ["users", "user_id"], csvKeywords: ["keywords", "keyword"], csvExpected: ["expected", "change_id"], csvDocs: ["docsMeta", "doc_id"] };
 Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  const rows = parseCSV(await readFile(f));
+  const text = await readFile(f);
+  if (blockIfPII("CSV 업로드", [{ source: f.name, findings: scanPII(text, { allowEmail: key === "users" }) }])) return;
+  const rows = parseCSV(text);
   if (!rows.length || !(must in rows[0])) return toast(`${f.name}: '${must}' 컬럼이 있는 CSV가 필요합니다`);
   state[key] = rows; save(); renderAll(); toast(`${f.name}: ${rows.length}행을 반영했습니다`);
 });
