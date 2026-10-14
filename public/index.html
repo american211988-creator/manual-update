@@ -433,7 +433,8 @@ function restore() {
     if (!d) return false;
     Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
     ["users", "keywords", "expected", "docsMeta"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
-    state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })).concat(d.library || []);
+    const up = d.library || [], upNames = new Set(up.map(f => f.name));
+    state.library = SAMPLE.files.filter(f => !upNames.has(f.name)).map(f => ({ ...f, uploaded: false })).concat(up);
     return state.runs.length > 0;
   } catch (e) { return false; }
 }
@@ -456,8 +457,8 @@ function parseDoc(file) {
   }
   const head = preamble.join(" ");
   const meta = state.docsMeta.find(d => d.file_name === file.name);
-  const version = meta?.version || (head.match(/\((v[\d.]+)/) || file.name.match(/_(v[\d.]+)/) || [])[1] || "";
-  const eff = meta?.effective_date || (head.match(/시행일\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
+  const version = (head.match(/\((v[\d.]+)/) || file.name.match(/_(v[\d.]+)/) || [])[1] || meta?.version || "";
+  const eff = (head.match(/시행일\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || meta?.effective_date || "";
   const title = meta?.title || (head.match(/\]\s*(.+?)\s*\(v/) || [])[1]
     || file.name.replace(/\.(txt|docx)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
   return { name: file.name, title: norm(title), version, eff, meta, articles, preamble: head, cls: classify(file.name, file.text) };
@@ -541,8 +542,9 @@ function compareDocs(oldDoc, newDoc) {
   return { changes, total: keys.length };
 }
 
-function baseDocId(newDoc) {
-  return (newDoc.meta?.doc_id || "").replace(/-\d+$/, "") || "UPL-" + tight(newDoc.title).slice(0, 12);
+function baseDocId(list) {   // 같은 문서의 어느 버전이든 문서 메타에 있으면 그 문서 ID를 쓴다
+  const known = [...list].reverse().find(d => d.meta?.doc_id);
+  return known ? known.meta.doc_id.replace(/-\d+$/, "") : "UPL-" + tight(list[list.length - 1].title).slice(0, 12);
 }
 
 function groupPII(list) { return list.slice(-2).map(d => ({ source: d.name, findings: scanPII(d.preamble + "\n" + d.articles.map(a => a.title + " " + a.body).join("\n")) })); }
@@ -550,14 +552,18 @@ function runGroup(list) {
   if (list.length < 2) return null;
   const oldDoc = list[list.length - 2], newDoc = list[list.length - 1];
   const { changes, total } = compareDocs(oldDoc, newDoc);
-  const docId = baseDocId(newDoc);
+  const docId = baseDocId(list);
+  // 다시 비교해도 담당자가 고친 비고는 유지한다
+  const prev = state.runs.find(r => r.docId === docId && r.newVer === newDoc.version);
+  const keyOf = c => [c.section, c.type, c.before, c.after].join("\u0001");
+  const edited = new Map((prev?.changes || []).filter(c => c.note !== c.auto).map(c => [keyOf(c), c.note]));
   const run = {
     id: docId + "@" + newDoc.version, docId, title: newDoc.title, docType: newDoc.cls.type, hits: newDoc.cls.hits,
     oldName: oldDoc.name, newName: newDoc.name, oldVer: oldDoc.version, newVer: newDoc.version,
     eff: newDoc.eff || today(), owner: newDoc.meta?.owner_name || "", detectedAt: nowStr(),
-    total, changes: changes.map((c, i) => ({ ...c, id: `CHG-${docId}-${String(i + 1).padStart(2, "0")}` })),
+    total, changes: changes.map((c, i) => ({ ...c, note: edited.get(keyOf(c)) ?? c.note, id: `CHG-${docId}-${String(i + 1).padStart(2, "0")}` })),
   };
-  state.runs = state.runs.filter(r => r.id !== run.id).concat(run);
+  state.runs = state.runs.filter(r => r.id !== run.id && !(r.docId === docId && r.newVer === run.newVer)).concat(run);
   notify(run);
   return run;
 }
@@ -572,14 +578,17 @@ function notify(run) {
     const subs = (u.subscribed_types || "").split("|").map(s => s.trim());
     if (!subs.includes(run.docType)) continue;
     const id = `${u.user_id}:${run.id}`;
+    const old = state.notices.find(n => n.id === id);
     state.notices = state.notices.filter(n => n.id !== id);
-    state.notices.unshift({
+    const notice = {
       id, userId: u.user_id, userName: u.name, email: u.email, runId: run.id, at: run.detectedAt, read: false,
       subject: `[Hana Life] ${run.title} 변경 안내`,
       body: `${u.name}님,\n구독 중인 '${run.docType}' 문서(${run.newVer})에 변경이 감지되었습니다.\n- 개정 ${c.개정}건, 신설 ${c.신설}건, 삭제 ${c.삭제}건\n- 시행일: ${run.eff}\n첨부된 변경대비표를 확인해 주세요.\n\n` +
         run.changes.map(x => `· [${x.type}] ${x.section}${x.note ? " — " + x.note : ""}`).join("\n") +
         `\n\n※ 본 메일은 가상 데이터입니다.`,
-    });
+    };
+    if (old && old.body === notice.body) { notice.read = old.read; notice.at = old.at; }
+    state.notices.unshift(notice);
   }
 }
 
@@ -742,7 +751,7 @@ function renderInbox() {
   $("#msgs").querySelectorAll(".msg").forEach(b => b.onclick = () => {
     const n = state.notices.find(x => x.id === b.dataset.id); n.read = true; state.currentMsg = n.id; save(); renderInbox();
   });
-  const cur = state.notices.find(n => n.id === state.currentMsg) || list[0];
+  const cur = list.find(n => n.id === state.currentMsg) || list[0];
   $("#msgView").innerHTML = cur ? `<div style="display:grid;gap:10px">
       <div class="bar"><div><h3>${esc(cur.subject)}</h3></div><div><button class="btn small" id="copyMail">본문 복사</button><button class="btn small" id="openRun">변경대비표 열기</button></div></div>
       <pre class="mail">${esc("받는 사람: " + cur.userName + " <" + cur.email + ">\n제목: " + cur.subject + "\n\n" + cur.body)}</pre></div>` : "";
@@ -987,12 +996,14 @@ async function addFiles(files) {
   // 개인정보가 한 파일이라도 있으면 이번 업로드 전체를 반영하지 않는다
   if (blockIfPII("업로드", ready.map(f => ({ source: f.name, findings: [...scanPII(f.name).map(x => ({ ...x, line: 0 })), ...scanPII(f.text)] })))) return;
   for (const f of ready) state.library = state.library.filter(x => x.name !== f.name).concat({ ...f, uploaded: true });
+  const names = new Set(ready.map(f => f.name));   // 내용이 바뀐 파일로 만든 비교 결과는 지운다
+  state.runs = state.runs.filter(r => !names.has(r.oldName) && !names.has(r.newName));
   if (ready.length) { save(); renderAll(); toast(`${ready.length}개 파일을 문서함에 추가했습니다`); }
 }
 $("#fileInput").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
 const drop = $("#drop");
 drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
-drop.ondragleave = () => drop.classList.remove("over");
+drop.ondragleave = e => { if (!drop.contains(e.relatedTarget)) drop.classList.remove("over"); };
 drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); addFiles([...e.dataTransfer.files]); };
 
 $("#runAllBtn").onclick = () => {
