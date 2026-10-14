@@ -574,7 +574,7 @@ function notify(run) {
     state.notices = state.notices.filter(n => n.id !== id);
     state.notices.unshift({
       id, userId: u.user_id, userName: u.name, email: u.email, runId: run.id, at: run.detectedAt, read: false,
-      subject: `[가나다생명] ${run.title} 변경 안내`,
+      subject: `[Hana Life] ${run.title} 변경 안내`,
       body: `${u.name}님,\n구독 중인 '${run.docType}' 문서(${run.newVer})에 변경이 감지되었습니다.\n- 개정 ${c.개정}건, 신설 ${c.신설}건, 삭제 ${c.삭제}건\n- 시행일: ${run.eff}\n첨부된 변경대비표를 확인해 주세요.\n\n` +
         run.changes.map(x => `· [${x.type}] ${x.section}${x.note ? " — " + x.note : ""}`).join("\n") +
         `\n\n※ 본 메일은 가상 데이터입니다.`,

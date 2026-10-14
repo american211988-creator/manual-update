@@ -1,4 +1,4 @@
-가나다생명 심사부 AI PoC 더미 데이터 (전부 가상 데이터)
+Hana Life 심사부 AI PoC 더미 데이터 (전부 가상 데이터)
 
 [documents/]  신구 문서 3쌍(6개) + 분류 불가 테스트용 회의록 1개
 [documents.csv]  문서 메타 (doc_id, 유형, 버전, 파일명 등)
