@@ -1066,7 +1066,12 @@ async function loadVset(set) {
   const csvOf = async n => parseCSV((await (await get(n)).text()).normalize("NFC"));
   const files = [], readErrors = [];
   for (const n of set.files) {
-    try { const blob = await (await get(n)).blob(); files.push({ name: n.normalize("NFC"), text: (await readFile(new File([blob], n))).normalize("NFC"), set: set.label }); }
+    try {
+      // 아티팩트처럼 .docx/.xlsx를 그대로 못 싣는 곳에서는 같은 이름 + ".b64.txt"(base64) 사본을 읽는다
+      const blob = await get(n).then(r => r.blob(), async e => {
+        const b64 = (await get(n + ".b64.txt").catch(() => { throw e; }).then(r => r.text())).replace(/\s+/g, "");
+        return new Blob([Uint8Array.from(atob(b64), c => c.charCodeAt(0))]);
+      }); files.push({ name: n.normalize("NFC"), text: (await readFile(new File([blob], n))).normalize("NFC"), set: set.label }); }
     catch (e) { readErrors.push({ name: n, set: set.label, msg: e.message }); }
   }
   return { files, meta: await csvOf(set.meta), expected: await csvOf(set.expected), metrics: await csvOf(set.metrics), readErrors };
