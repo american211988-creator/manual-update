@@ -857,8 +857,10 @@ $("#xlsxBtn").onclick = () => {
   };
   state.runs.forEach(r => add(r.title, HEAD, r.changes.map(x => [x.section, x.before, x.after, x.type, x.note])));
   if (state.runs.length > 1) add("통합정리본", ["문서", ...HEAD], state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])));
-  try { XLSX.writeFile(wb, `변경대비표_${today()}.xlsx`); toast("엑셀 파일을 만들었습니다"); }
-  catch (e) { toast("이 화면에서는 내려받기가 막혀 있습니다. ‘표 복사’를 사용하세요."); }
+  let blob;
+  try { blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })]); }
+  catch (e) { return toast("엑셀 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
+  saveBlob(blob, `변경대비표_${today()}.xlsx`, "엑셀");
 };
 
 /* ---------- 워드(.docx) 내려받기: 외부 라이브러리 없이 직접 만든다 ---------- */
@@ -937,17 +939,31 @@ function buildDocx(runs) {
   ];
   return zipStore(files, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 }
-function saveBlob(blob, name) {
+/* 파일 저장: Claude 아티팩트에서는 downloads 기능(저장 확인창), 일반 브라우저(Vercel 등)에서는 바로 내려받기 */
+let dlNs;
+const getDownloads = () => dlNs ??= (window.claude?.use ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null));
+async function saveBlob(blob, name, label) {
+  const dl = await getDownloads();
+  if (dl) {
+    try { await dl.save({ filename: name, data: blob }); toast(`${label} 파일을 저장했습니다`); }
+    catch (e) {
+      const msg = { declined: "저장을 취소했습니다", rate_limited: "이미 저장 확인창이 열려 있습니다. 잠시 뒤 다시 시도하세요" }[e?.code];
+      toast(msg || "이 화면에서는 저장할 수 없습니다. ‘표 복사’를 사용하세요.");
+    }
+    return;
+  }
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`${label} 파일을 만들었습니다`);
 }
 $("#docxBtn").onclick = () => {
   if (!state.runs.length) return toast("먼저 문서를 비교하세요");
   // 통합 정리본을 보고 있으면 전체 문서, 아니면 지금 보고 있는 문서만
   const runs = state.currentRun === "__all__" ? state.runs : state.runs.filter(r => r.id === state.currentRun);
   const name = runs.length === 1 ? `변경대비표_${runs[0].title.replace(/\s+/g, "")}_${runs[0].newVer}.docx` : `변경대비표_통합_${today()}.docx`;
-  try { saveBlob(buildDocx(runs), name); toast("워드 파일을 만들었습니다"); }
-  catch (e) { toast("워드 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
+  let blob;
+  try { blob = buildDocx(runs); } catch (e) { return toast("워드 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
+  saveBlob(blob, name, "워드");
 };
 
 /* ---------- 입력 ---------- */
