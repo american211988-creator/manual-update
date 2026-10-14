@@ -524,15 +524,48 @@ function groupLibrary() {
 }
 
 /* ---------- 비교 ---------- */
+/* 낱말 비교 단위: 띄어쓰기로 나눈 뒤 끝의 문장부호와 조사를 따로 떼어 낸다.
+   떼어 낸 조각은 앞 낱말에 붙는다는 표시(GLUE)를 달아, 다시 이어 쓸 때 띄어쓰지 않는다.
+   이렇게 하면 '1억원으로 → 1억 5천만원으로'에서 바뀐 '1억원 → 1억 5천만원'만 표시된다. */
+const GLUE = "\u0001";
+const PARTICLES = ["으로서", "으로써", "이라도", "으로", "에서", "에게", "까지", "부터", "보다", "처럼", "마다", "이나",
+  "과", "와", "을", "를", "은", "는", "이", "가", "에", "의", "로", "도", "만"];
+const PARTICLE_SET = new Set(PARTICLES);
+const SAFE1 = new Set(["와", "을", "를", "은", "는", "에", "로"]);   // 한 글자 낱말 뒤에서도 떼어도 되는 조사
+function tokenize(s) {
+  const out = [];
+  for (const w of String(s).split(" ")) {
+    if (!w) continue;
+    let word = w; const tail = [];
+    const pm = word.match(/^(.*?)([.,;:!?)」』”’]+)$/);
+    if (pm && pm[1]) { word = pm[1]; tail.push(GLUE + pm[2]); }
+    // 한 글자 조사(이·가·의·과·도·만)는 낱말이 2글자 이상일 때만 뗀다 ('나이', '회의', '효과' 같은 낱말을 쪼개지 않게)
+    // 겹조사는 두 번까지 나눈다 (송금으로만 → 송금 + 으로 + 만)
+    const parts = [];
+    for (let k = 0; k < 2; k++) {
+      const p = PARTICLES.find(p => word.endsWith(p) && word.length - p.length >= (p.length === 1 && !SAFE1.has(p) ? 2 : 1) && /[가-힣0-9%A-Za-z)]$/.test(word.slice(0, -p.length)));
+      if (!p) break;
+      parts.unshift(GLUE + p); word = word.slice(0, -p.length);
+    }
+    out.push(word, ...parts, ...tail);
+  }
+  return out;
+}
+function joinTokens(list) {
+  return list.reduce((acc, t) => t.startsWith(GLUE) ? acc + t.slice(1) : (acc ? acc + " " : "") + t, "");
+}
+// 받침에 따라 꼴만 바뀌는 조사는 같은 것으로 본다 (예: 앱으로 ↔ 홈페이지로)
+const ALLO = { 으로: "로", 을: "를", 은: "는", 이: "가", 과: "와" };
+const tokKey = t => t.startsWith(GLUE) && ALLO[t.slice(1)] ? GLUE + ALLO[t.slice(1)] : t;
 function tokenDiff(a, b) {
-  const A = a.split(" "), B = b.split(" ");
+  const A = tokenize(a), B = tokenize(b), AK = A.map(tokKey), BK = B.map(tokKey);
   const n = A.length, m = B.length;
   const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
   for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
-    L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    L[i][j] = AK[i] === BK[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
   const ops = []; let i = 0, j = 0;
   while (i < n || j < m) {
-    if (i < n && j < m && A[i] === B[j]) { ops.push(["=", A[i]]); i++; j++; }
+    if (i < n && j < m && AK[i] === BK[j]) { ops.push(["=", A[i], B[j]]); i++; j++; }   // 같음: 현행 꼴, 개정 꼴을 함께 둔다
     else if (j < m && (i === n || L[i][j + 1] >= L[i + 1][j])) { ops.push(["+", B[j]]); j++; }
     else { ops.push(["-", A[i]]); i++; }
   }
@@ -586,18 +619,69 @@ function diffOps(a, b) {
       });
       ops.push(["=", "[/표]"]);
     });
-    res = { ops: ops.filter(([o, w], k) => !(o === "=" && w === "" && k === 0)), note: notes.join(", ") };
+    res = { ops: ops.filter(([o, w], k) => !(o === "=" && w === "" && k === 0)), note: notes.join(" / ") };
   }
   if (diffCache.size > 500) diffCache.clear();
   diffCache.set(ck, res);
   return res;
 }
+/* 비고 자동 작성: 바뀐 구간마다 'A → B', 'A' 삭제, 'B' 추가로 적는다.
+   - 구간이 조사·쉼표로 시작하면 앞 낱말을 함께 넣어 읽히게 한다 (예: 송금으로 → 송금으로만)
+   - 양쪽 끝의 같은 종류 조사·문장부호는 빼고 적는다 (예: 10%를 → 20%를 ⇒ 10% → 20%)
+   - 문장 대부분이 바뀌면 조각내지 않고 '문장 개정 → ‘새 문장’'으로 적는다 */
+const clip = (t, n = 36) => t.length > n ? t.slice(0, n - 1) + "…" : t;
 function autoNote(ops) {
-  const pairs = []; let del = [], add = [];
-  const flush = () => { if (del.length || add.length) pairs.push(`${del.join(" ") || "∅"} → ${add.join(" ") || "∅"}`); del = []; add = []; };
-  for (const [o, w] of ops) { if (o === "=") flush(); else (o === "-" ? del : add).push(w); }
-  flush();
-  return pairs.join(", ");
+  let spans = []; let cur = null;
+  ops.forEach(([o, w], i) => { if (o === "=") { cur = null; return; } if (!cur) spans.push(cur = { del: [], add: [], start: i, end: i }); (o === "-" ? cur.del : cur.add).push(w); cur.end = i; });
+  if (!spans.length) return "";
+  const oldN = ops.filter(([o]) => o !== "+").length, newN = ops.filter(([o]) => o !== "-").length;
+  const changed = spans.reduce((a, s) => a + s.del.length + s.add.length, 0);
+  if (changed >= 8 && changed / (oldN + newN) >= 0.45) {
+    const after = joinTokens(ops.filter(([o]) => o !== "-").map(op => op[0] === "=" ? (op[2] ?? op[1]) : op[1])).replace(/[.\s]+$/, "");
+    return `문장 개정 → ‘${clip(after, 40)}’`;
+  }
+  // 두 바뀐 구간 사이가 두 글자 이하(예: '후')면 한 구간으로 합친다 → '3영업일 후 → 2영업일 후와 5영업일 후에'
+  spans = spans.reduce((acc, sp) => {
+    const prev = acc[acc.length - 1];
+    if (prev) {
+      const gap = ops.slice(prev.end + 1, sp.start).map(([, w]) => w);
+      if (gap.length <= 2 && joinTokens(gap).replace(/\s/g, "").length <= 2) {
+        const gapOps = ops.slice(prev.end + 1, sp.start);
+        prev.del.push(...gapOps.map(op => op[1]), ...sp.del); prev.add.push(...gapOps.map(op => op[2] ?? op[1]), ...sp.add); prev.end = sp.end; return acc;
+      }
+    }
+    acc.push(sp); return acc;
+  }, []);
+  // 앞 낱말(어절)을 문맥으로 가져온다. 한 글자뿐이면 한 어절 더 가져온다 (예: 주 → 첫째 주)
+  const wordBefore = (i, side) => {
+    const w = []; let words = 0;
+    for (let j = i - 1; j >= 0 && ops[j][0] === "="; j--) {
+      const t = side === "new" ? (ops[j][2] ?? ops[j][1]) : ops[j][1];
+      w.unshift(t);
+      if (!t.startsWith(GLUE)) { words++; if (words >= 2 || joinTokens(w).length > 1) break; }
+    }
+    return w;
+  };
+  const isPunct = t => /^\u0001[.,;:!?)」』”’]+$/.test(t);
+  const isParticle = t => t.startsWith(GLUE) && PARTICLE_SET.has(t.slice(1));
+  return spans.map(sp => {
+    let del = sp.del, add = sp.add;
+    if (del[0]?.startsWith(GLUE) || add[0]?.startsWith(GLUE)) { del = [...wordBefore(sp.start, "old"), ...del]; add = [...wordBefore(sp.start, "new"), ...add]; }
+    const trimPunct = l => { l = l.slice(); while (l.length && isPunct(l[l.length - 1])) l.pop(); return l; };
+    del = trimPunct(del); add = trimPunct(add);
+    // 양쪽 끝 조사가 같은 조사일 때만 뺀다 (사이에서만 → 사이에서 처럼 조사 자체가 바뀐 경우는 그대로 둔다)
+    if (del.length > 1 && add.length > 1 && isParticle(del[del.length - 1]) && tokKey(del[del.length - 1]) === tokKey(add[add.length - 1])) {
+      const d2 = del.slice(0, -1), a2 = add.slice(0, -1);
+      if (joinTokens(d2) !== joinTokens(a2)) { del = d2; add = a2; }
+    }
+    const d = clip(joinTokens(del)), a = clip(joinTokens(add));
+    if (d && a) return d === a ? null : `${d} → ${a}`;
+    if (d) return `‘${d}’ 삭제`;
+    if (a) return `‘${a}’ 추가`;
+    return null;
+  }).filter(Boolean).reduce((acc, t) => {   // 같은 변경이 여러 곳이면 한 번만 적고 곳 수를 붙인다
+    const hit = acc.find(x => x.t === t); hit ? hit.n++ : acc.push({ t, n: 1 }); return acc;
+  }, []).map(x => x.n > 1 ? `${x.t}(${x.n}곳)` : x.t).join(" / ");
 }
 
 function compareDocs(oldDoc, newDoc) {
@@ -612,7 +696,7 @@ function compareDocs(oldDoc, newDoc) {
     if (o && n) {
       if (o.body === n.body && o.title === n.title) continue;
       const d = diffOps(o.body, n.body);
-      const note = o.title !== n.title ? `조문 제목 변경(${o.title} → ${n.title})` + (o.body !== n.body ? ", " + d.note : "") : d.note;
+      const note = o.title !== n.title ? `조문 제목 변경(${o.title} → ${n.title})` + (o.body !== n.body ? " / " + d.note : "") : d.note;
       changes.push({ section: `${k}(${n.title})`, type: "개정", before: o.body, after: n.body, note, auto: note });
     } else if (n) {
       changes.push({ section: `${k}(${n.title})`, type: "신설", before: "", after: n.body, note: "조항 신설", auto: "조항 신설" });
@@ -1029,7 +1113,10 @@ const HEAD = ["조항", "현행", "개정", "변경유형", "비고"];
 function diffSegs(x, side) {
   if (x.type === "개정") {
     const ops = diffOps(x.before, x.after).ops.filter(([o]) => o === "=" || o === (side === "old" ? "-" : "+"));
-    return ops.flatMap(([o, w], i) => [...(i ? [{ t: " " }] : []), { t: w, mark: o === "=" ? null : side }]);
+    return ops.flatMap((op, i) => {
+      const w = side === "new" && op[0] === "=" ? (op[2] ?? op[1]) : op[1], mark = op[0] === "=" ? null : side;
+      return w.startsWith(GLUE) ? [{ t: w.slice(1), mark }] : [...(i ? [{ t: " " }] : []), { t: w, mark }];
+    });
   }
   const t = side === "old" ? x.before : x.after;
   return t ? markSegs(t, side) : [{ t: side === "old" ? "(신설)" : "(삭제)", mark: "muted" }];
