@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <!--HEAD-END-->
-<title>기준문서 변경관리</title>
+<title>내규/매뉴얼 변경대비 업데이트</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=VT323&display=swap">
@@ -223,7 +223,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
   <header class="top">
     <div class="lcd">
       <div class="lcd-row"><span class="lcd-org">Hana Life · 계약심사부</span><span class="led" aria-hidden="true"></span></div>
-      <h1>기준문서 변경관리<span class="cursor" aria-hidden="true">_</span></h1>
+      <h1>내규/매뉴얼 변경대비 업데이트<span class="cursor" aria-hidden="true">_</span></h1>
       <div class="lcd-row lcd-foot"><span id="lcdLeft">P1</span><span id="lcdRight">0</span></div>
     </div>
     <div class="notice intro" role="note">
@@ -934,7 +934,7 @@ function docxBody(runs) {
       wPara(wRun(`${r.title} 변경대비표`, { b: true, sz: 32 }), { after: 80, keepNext: true }) +
       wPara(wRun(`${r.oldVer} → ${r.newVer} · 시행일 ${r.eff} · 문서유형 ${r.docType} · 변경 ${r.changes.length}건 (개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}) · 변경률 ${pct(r.changes.length / (r.total || 1))}`, { color: "4A453E", sz: 19 }), { after: 200, keepNext: true }) +
       table +
-      wPara(wRun(`원본: ${r.oldName} → ${r.newName} · 작성일 ${today_} · 기준문서 변경관리에서 자동 생성`, { color: "7A7368", sz: 16 }), { before: 160 });
+      wPara(wRun(`원본: ${r.oldName} → ${r.newName} · 작성일 ${today_} · 내규/매뉴얼 변경대비 업데이트에서 자동 생성`, { color: "7A7368", sz: 16 }), { before: 160 });
   }).join("");
 }
 function buildDocx(runs) {
