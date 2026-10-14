@@ -24,7 +24,6 @@ Vercel에서 이 저장소를 Import하면 설정을 따로 바꿀 필요가 없
 | 정답 검증 | `expected_changes.csv`와 건별 대조 (일치/누락/오탐/유형·내용 불일치) | 정확도 90% 이상이면 목표 충족 |
 | 알림함 | 문서유형을 구독한 담당자별 알림 메일 본문 (실제 발송 없음) | `users.csv`의 `subscribed_types` |
 | 집계 | 월별·연도별 변경 건수, 문서별 변경률, 절감 시간 계산 | 변경률 = 변경 조항 ÷ 전체 조항 × 100 |
-| AI 도우미 | 변경대비표를 근거로 질문·요약·담당자 안내문 작성 (OpenRouter 무료 NVIDIA Nemotron) | 개인정보 탐지 시 전송 중단 |
 | 기준 데이터 | 담당자·키워드·정답표·문서 메타 확인, CSV로 교체 | |
 
 ## 개인정보 차단
@@ -38,23 +37,11 @@ Vercel에서 이 저장소를 Import하면 설정을 따로 바꿀 필요가 없
 담당자 CSV의 이메일 열과 `example.com` 같은 예시 도메인은 예외입니다.
 시연용으로 `data/pii_test/개인정보_포함_샘플_v1.0.txt`(가짜 값)를 올리면 업로드가 차단됩니다.
 
-## AI 도우미 (챗봇)
-
-Vercel 서버 함수 `api/chat.js`가 OpenRouter를 호출합니다. API 키는 서버에만 있고 브라우저로 내려가지 않습니다.
-
-- **필수 환경변수**: Vercel → Settings → Environment Variables에 `OPENROUTER_API_KEY` 추가 후 재배포
-- **모델**: 기본 `nvidia/nemotron-3-super-120b-a12b:free`. 사용량이 몰려 응답이 없으면 `nemotron-3-ultra-550b-a55b:free`, `nemotron-3.5-lightning:free` 순으로 자동 전환합니다. 바꾸려면 `OPENROUTER_MODEL` 환경변수를 지정하세요.
-- **보내는 내용**: 질문, 이전 대화, (선택) 현재 변경대비표 요약. 시스템 지시문은 서버에 고정되어 있습니다.
-- **보호 장치**: 브라우저와 서버 양쪽에서 개인정보를 검사해 차단, 다른 사이트에서의 호출 차단, 질문 2,000자·대화 20개·자료 16,000자 제한
-- **주의**: 무료 모델은 입력이 제공사에 저장·학습될 수 있으니 사내 기밀·고객정보를 넣지 마세요. Claude 아티팩트 링크나 로컬 파일로 열면 서버가 없어 AI 도우미는 동작하지 않습니다.
-- 상태 확인: `GET /api/chat` → `{"ok":true,"configured":true,"model":"..."}`
-
 ## 폴더
 
 - `data/` : 더미 데이터 원본 (신구 문서 3쌍 + 회의록, 정답표, 담당자, 키워드, 메일 샘플, 대비표 양식)
 - `app/src.html` : 앱 소스
 - `public/index.html` : 빌드 결과 (샘플 데이터 포함). `data/`나 `app/src.html`을 고치면 `python3 tools/build.py`로 다시 만들어 함께 커밋하세요.
-- `api/chat.js` : AI 도우미 서버 함수 (OpenRouter 호출)
 - `vercel.json` : Vercel 배포 설정
 
 ## 샘플 검증 결과
