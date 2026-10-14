@@ -73,7 +73,7 @@ footer { font-size: 0.8rem; color: var(--muted); }
   <header class="lcd">
     <div class="lcd-row"><span>Hana Life · 내규/매뉴얼 변경대비 업데이트 PoC</span><span><span class="led"></span>검증 기준일 2026-10-14</span></div>
     <h1>변경대비 업데이트 검증 리포트</h1>
-    <p class="muted">외부 평가(10/14 15:37)에서 미검증으로 남은 ‘새 파일 업로드·읽기’와 ‘신규 자료 기준 분류·변경 비교·알림·집계·변경률 정확도’를 보완 검증한 결과입니다. 같은 검증을 운영 사이트의 ‘정답 검증 → 운영 검증 실행’ 버튼으로 누구나 다시 돌릴 수 있습니다. 모든 회사명·금액·인명은 가상 데이터입니다.</p>
+    <p class="muted">외부 평가(10/14 15:37)에서 미검증으로 남은 ‘새 파일 업로드·읽기’와 ‘신규 자료 기준 분류·변경 비교·알림·집계·변경률 정확도’를 보완 검증한 결과입니다. 같은 검증을 운영 사이트의 ‘검증 탭 → 검증 실행’ 버튼으로 누구나 다시 돌릴 수 있습니다. 모든 회사명·금액·인명은 가상 데이터입니다.</p>
     <div class="lcd-row"><span>대상: main 최신(PR #22 병합본) · Vercel / Claude 아티팩트 동일 버전</span><span>판정 기준: 정확도 90% 이상</span></div>
   </header>
 
@@ -166,7 +166,7 @@ footer { font-size: 0.8rem; color: var(--muted); }
         <li>정답(기대값)은 앱과 따로 계산: 변경 정답표는 생성 스크립트의 변경 목록에서, 조항 수·변경률·알림 대상·집계는 <code>tools/make_expected_metrics.py</code>로 계산 (샘플은 원문 파일을 직접 읽어 셈).</li>
         <li>시험용 자료 생성: 변경 목록(무엇을 어떻게 바꿨는지)에서 신구 문서와 정답표를 함께 만들어, 문서와 정답이 어긋나지 않게 함 (<code>tools/make_test_pack*.py</code>).</li>
         <li>앱의 ‘기준 데이터’에 문서 메타·정답표 CSV를 올리고, 문서를 문서함에 한꺼번에 끌어다 놓음.</li>
-        <li>‘전체 신구 비교 실행’ 후 ‘정답 검증’ 탭의 건별 대조로 판정.</li>
+        <li>‘전체 신구 비교 실행’ 후 ‘검증’ 탭의 건별 대조로 판정.</li>
         <li>실행 환경: 운영과 같은 빌드(<code>public/index.html</code>)를 Chromium 브라우저에서 자동 조작.</li>
       </ol>
       <p class="muted">재현 자료: 저장소 <code>data/test_pack/</code>, <code>data/test_pack2/</code> (각 README에 넣는 순서). 앱: <a href="https://manual-update.vercel.app/" target="_blank" rel="noopener">manual-update.vercel.app</a></p>
