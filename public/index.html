@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!--HEAD-END-->
+<title>기준문서 변경관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600&family=Nanum+Myeongjo:wght@700;800&display=swap">
+<style>
+/* Layout: 사내 규정집 같은 종이 위에 탭으로 나눈 업무 도구. 표가 주인공, 장식은 변경유형 도장(개정·신설·삭제)에만 쓴다. */
+:root {
+  --paper: #F4F5F1;
+  --surface: #FFFFFF;
+  --ink: #17202A;
+  --muted: #5A6570;
+  --line: #D9DDD5;
+  --accent: #1D4E89;
+  --accent-weak: #E2EBF6;
+  --rev: #8F5B00; --rev-bg: #FBEFD6;
+  --new: #1C7343; --new-bg: #DFF1E5;
+  --del: #AE2A20; --del-bg: #FAE2DF;
+  --font-display: "Nanum Myeongjo", "Batang", serif;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11161C; --surface: #19212A; --ink: #E5E9ED; --muted: #98A3AE; --line: #2B3540;
+    --accent: #84B3EA; --accent-weak: #1C2C40;
+    --rev: #E9B65C; --rev-bg: #382A10; --new: #6FCB96; --new-bg: #142E1E; --del: #F1897F; --del-bg: #3A1917;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #11161C; --surface: #19212A; --ink: #E5E9ED; --muted: #98A3AE; --line: #2B3540;
+  --accent: #84B3EA; --accent-weak: #1C2C40;
+  --rev: #E9B65C; --rev-bg: #382A10; --new: #6FCB96; --new-bg: #142E1E; --del: #F1897F; --del-bg: #3A1917;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 14px/1.6 var(--font-body); }
+.wrap { max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 20px 48px; display: grid; gap: 20px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font: 800 1.6rem/1.25 var(--font-display); letter-spacing: -0.01em; }
+h2 { font: 700 1.2rem/1.3 var(--font-display); }
+h3 { font-size: 0.95rem; font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.mono, .num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+header.top { display: grid; gap: 12px; }
+.brand { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.brand .org { font-size: 0.8rem; color: var(--accent); font-weight: 600; letter-spacing: 0.04em; }
+.lede { color: var(--muted); max-width: 70ch; }
+
+nav.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); overflow-x: auto; position: sticky; top: env(safe-area-inset-top, 0px); background: var(--paper); z-index: 5; }
+nav.tabs button { appearance: none; border: 0; background: none; color: var(--muted); font: 500 0.92rem var(--font-body); padding: 10px 14px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
+nav.tabs button:hover { color: var(--ink); }
+nav.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.badge { min-width: 18px; padding: 0 6px; border-radius: 9px; background: var(--accent); color: var(--surface); font: 600 0.7rem/18px var(--font-data); text-align: center; }
+
+section.panel, #runDetail, #verifyBody, #statsBody { display: grid; gap: 16px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.bar > div { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.box { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+
+button.btn, label.btn { appearance: none; font: 500 0.88rem var(--font-body); padding: 7px 12px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+button.btn:hover, label.btn:hover { border-color: var(--accent); }
+button.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+button.btn.small { padding: 3px 9px; font-size: 0.8rem; }
+button:focus-visible, label.btn:focus-within, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+label.btn input[type=file] { position: absolute; width: 1px; height: 1px; opacity: 0; }
+select, input[type=number], input[type=text] { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); color: var(--ink); }
+
+.drop { border: 1.5px dashed var(--line); border-radius: var(--r); padding: 18px; text-align: center; color: var(--muted); display: grid; gap: 8px; justify-items: center; }
+.drop.over { border-color: var(--accent); background: var(--accent-weak); color: var(--ink); }
+
+.scroll { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.86rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.75rem; color: var(--muted); font-weight: 600; letter-spacing: 0.03em; background: var(--paper); position: sticky; top: 0; white-space: nowrap; }
+td.clause { white-space: nowrap; font-weight: 600; }
+td.txt { min-width: 220px; max-width: 360px; }
+tr.empty td { color: var(--muted); text-align: center; padding: 24px; }
+table.cmp td.note input { width: 100%; min-width: 140px; }
+
+.stamp { display: inline-block; padding: 1px 8px; border-radius: 3px; font-weight: 600; font-size: 0.78rem; border: 1px solid currentColor; white-space: nowrap; }
+.t-개정 { color: var(--rev); background: var(--rev-bg); }
+.t-신설 { color: var(--new); background: var(--new-bg); }
+.t-삭제 { color: var(--del); background: var(--del-bg); }
+.t-ok { color: var(--new); background: var(--new-bg); }
+.t-bad { color: var(--del); background: var(--del-bg); }
+.t-warn { color: var(--rev); background: var(--rev-bg); }
+.t-none { color: var(--muted); background: var(--paper); }
+del { background: var(--del-bg); color: var(--del); text-decoration: line-through; text-decoration-thickness: 1px; }
+ins { background: var(--new-bg); color: var(--new); text-decoration: none; font-weight: 600; }
+
+.doclist { display: grid; gap: 10px; }
+.group { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.group:last-child { border-bottom: 0; }
+.group .files { display: flex; flex-wrap: wrap; gap: 6px; }
+.file { font: 0.78rem var(--font-data); padding: 2px 8px; border-radius: 3px; background: var(--paper); border: 1px solid var(--line); }
+.kw { font-size: 0.78rem; color: var(--muted); }
+@media (max-width: 560px) { .group { grid-template-columns: minmax(0, 1fr); } }
+
+.runs { display: flex; flex-wrap: wrap; gap: 6px; }
+.runs button { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 6px 10px; cursor: pointer; font: 500 0.85rem var(--font-body); }
+.runs button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-weak); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); }
+.facts > div { padding: 10px 14px; border-right: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; }
+.facts > div:last-child { border-right: 0; }
+.facts b { font: 600 1.05rem var(--font-data); font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .facts > div { border-right: 0; border-bottom: 1px solid var(--line); } }
+
+.verdict { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; padding: 14px 16px; border-radius: var(--r); border: 1px solid var(--line); background: var(--surface); }
+.verdict .big { font: 600 2rem/1 var(--font-data); }
+
+.inbox { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 760px) { .inbox { grid-template-columns: minmax(0, 1fr); } }
+.msgs { display: grid; border: 1px solid var(--line); border-radius: var(--r); background: var(--surface); overflow: hidden; }
+.msg { appearance: none; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); text-align: left; padding: 10px 12px; cursor: pointer; display: grid; gap: 2px; font: inherit; }
+.msg:last-child { border-bottom: 0; }
+.msg[aria-current="true"] { background: var(--accent-weak); }
+.msg.unread .subj { font-weight: 600; }
+.msg.unread .subj::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 2px; }
+.msg .subj { font-size: 0.88rem; }
+.msg .meta { font-size: 0.75rem; color: var(--muted); }
+pre.mail { margin: 0; white-space: pre-wrap; font: 0.88rem/1.7 var(--font-body); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; }
+
+.bars { display: grid; gap: 8px; }
+.barrow { display: grid; grid-template-columns: 76px minmax(0, 1fr) 44px; gap: 10px; align-items: center; font-size: 0.85rem; }
+.track { display: flex; height: 18px; background: var(--paper); border-radius: 3px; overflow: hidden; }
+.track span { display: block; height: 100%; }
+.seg-개정 { background: var(--rev); } .seg-신설 { background: var(--new); } .seg-삭제 { background: var(--del); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
+.calc label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--paper); padding: 8px 14px; border-radius: var(--r); font-size: 0.85rem; z-index: 20; max-width: calc(100% - 32px); }
+footer { color: var(--muted); font-size: 0.78rem; }
+@media (prefers-reduced-motion: no-preference) { nav.tabs button, .runs button, .msg { transition: background .15s, border-color .15s, color .15s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="org">가나다생명 심사부</span>
+      <h1>기준문서 변경관리</h1>
+    </div>
+    <p class="lede">사무처리기준·업무매뉴얼·내규 파일을 올리면 문서유형을 분류하고, 신구 버전을 조항 단위로 비교해 변경대비표(조항 | 현행 | 개정 | 변경유형 | 비고)를 만듭니다. 구독 담당자에게 알림을 남기고, 정답표로 정확도를 검증합니다.</p>
+    <nav class="tabs" role="tablist" id="tabs">
+      <button role="tab" data-tab="library" aria-selected="true">문서함·분류</button>
+      <button role="tab" data-tab="changes">변경대비표</button>
+      <button role="tab" data-tab="verify">정답 검증</button>
+      <button role="tab" data-tab="inbox">알림함 <span class="badge" id="unread" hidden>0</span></button>
+      <button role="tab" data-tab="stats">집계</button>
+      <button role="tab" data-tab="ref">기준 데이터</button>
+    </nav>
+  </header>
+
+  <!-- 1. 문서함·분류 -->
+  <section class="panel" id="tab-library">
+    <div class="drop" id="drop">
+      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.</p>
+      <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx">파일 선택</label>
+    </div>
+    <div class="bar">
+      <div><h2>문서함</h2><span class="muted" id="libCount"></span></div>
+      <div>
+        <button class="btn" id="resetBtn">샘플로 초기화</button>
+        <button class="btn primary" id="runAllBtn">전체 신구 비교 실행</button>
+      </div>
+    </div>
+    <div class="box"><div class="doclist" id="groups"></div></div>
+  </section>
+
+  <!-- 2. 변경대비표 -->
+  <section class="panel" id="tab-changes" hidden>
+    <div class="bar">
+      <div class="runs" id="runs"></div>
+      <div>
+        <button class="btn" id="copyBtn">표 복사 (엑셀 붙여넣기용)</button>
+        <button class="btn primary" id="xlsxBtn">엑셀 내려받기</button>
+      </div>
+    </div>
+    <div id="runDetail"></div>
+  </section>
+
+  <!-- 3. 정답 검증 -->
+  <section class="panel" id="tab-verify" hidden>
+    <div id="verifyBody"></div>
+  </section>
+
+  <!-- 4. 알림함 -->
+  <section class="panel" id="tab-inbox" hidden>
+    <div class="bar">
+      <div><h2>알림함</h2><span class="muted">실제 메일은 보내지 않고 화면 안에 알림을 쌓습니다.</span></div>
+      <div>
+        <label for="userFilter" class="muted">담당자</label>
+        <select id="userFilter"></select>
+        <button class="btn" id="readAllBtn">모두 읽음</button>
+      </div>
+    </div>
+    <div class="inbox">
+      <div class="msgs" id="msgs"></div>
+      <div id="msgView"></div>
+    </div>
+  </section>
+
+  <!-- 5. 집계 -->
+  <section class="panel" id="tab-stats" hidden>
+    <div id="statsBody"></div>
+  </section>
+
+  <!-- 6. 기준 데이터 -->
+  <section class="panel" id="tab-ref" hidden>
+    <div class="bar">
+      <div><h2>기준 데이터</h2><span class="muted">CSV를 올리면 해당 데이터를 교체합니다 (UTF-8, 첫 행은 컬럼명).</span></div>
+      <div>
+        <label class="btn"><input type="file" id="csvUsers" accept=".csv">담당자 CSV</label>
+        <label class="btn"><input type="file" id="csvKeywords" accept=".csv">분류 키워드 CSV</label>
+        <label class="btn"><input type="file" id="csvExpected" accept=".csv">정답표 CSV</label>
+        <label class="btn"><input type="file" id="csvDocs" accept=".csv">문서 메타 CSV</label>
+      </div>
+    </div>
+    <div id="refBody" class="two"></div>
+  </section>
+
+  <footer>모든 회사명·담당자·금액은 가상 데이터입니다. 작업 내용은 이 브라우저에만 저장됩니다.</footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script>
+const SAMPLE = {"files": [{"name": "계약인수_사무처리기준_v1.0.txt", "text": "[가나다생명 심사부] 계약인수 사무처리기준 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 기준은 가나다생명 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제11조(팩스 접수) 팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "계약인수_사무처리기준_v2.0.txt", "text": "[가나다생명 심사부] 계약인수 사무처리기준 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 기준은 가나다생명 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제9조의2(전자청약 심사) 전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v1.0.txt", "text": "[가나다생명 심사부] 보험금지급심사 업무매뉴얼 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 매뉴얼은 가나다생명 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 50만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제9조(우편 발송 대장) 우편 발송 건은 수기 대장에 기록하여 관리한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v2.0.txt", "text": "[가나다생명 심사부] 보험금지급심사 업무매뉴얼 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 매뉴얼은 가나다생명 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 100만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제8조의2(민원 이력 확인) 이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "심사업무운영_내규_v1.0.txt", "text": "[가나다생명 심사부] 심사업무운영 내규 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 내규는 가나다생명 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제8조(수기 대장 관리) 심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "심사업무운영_내규_v2.0.txt", "text": "[가나다생명 심사부] 심사업무운영 내규 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 내규는 가나다생명 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제6조의2(AI 도구 활용) 업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "회의록_샘플.txt", "text": "[가나다생명 심사부] 주간 회의록 (2026-10-05)\n\n- 안건: 10월 인수심사 현황 공유\n- 참석: 담당자A, 담당자B, 담당자C\n- 결정: 다음 주 교육 일정 확정\n"}], "csv": {"documents": "doc_id,title,doc_type,version,effective_date,owner_name,file_name\nDOC-001-1,계약인수 사무처리기준,사무처리기준,v1.0,2026-01-01,담당자A,계약인수_사무처리기준_v1.0.txt\nDOC-001-2,계약인수 사무처리기준,사무처리기준,v2.0,2026-07-01,담당자A,계약인수_사무처리기준_v2.0.txt\nDOC-002-1,보험금지급심사 업무매뉴얼,업무매뉴얼,v1.0,2026-01-01,담당자B,보험금지급심사_업무매뉴얼_v1.0.txt\nDOC-002-2,보험금지급심사 업무매뉴얼,업무매뉴얼,v2.0,2026-07-01,담당자B,보험금지급심사_업무매뉴얼_v2.0.txt\nDOC-003-1,심사업무운영 내규,내규,v1.0,2026-01-01,담당자C,심사업무운영_내규_v1.0.txt\nDOC-003-2,심사업무운영 내규,내규,v2.0,2026-07-01,담당자C,심사업무운영_내규_v2.0.txt\n", "users": "user_id,name,team,email,subscribed_types\nU01,담당자A,심사1팀,a@example.com,사무처리기준|내규\nU02,담당자B,심사1팀,b@example.com,업무매뉴얼\nU03,담당자C,심사2팀,c@example.com,내규|업무매뉴얼\nU04,담당자D,심사2팀,d@example.com,사무처리기준\nU05,팀장E,심사부,e@example.com,사무처리기준|업무매뉴얼|내규\n", "classification_keywords": "doc_type,keyword\n사무처리기준,사무처리\n사무처리기준,인수기준\n사무처리기준,처리기준\n업무매뉴얼,업무매뉴얼\n업무매뉴얼,지급심사\n업무매뉴얼,매뉴얼\n내규,내규\n내규,운영규정\n내규,전결\n품의문,품의\n품의문,결재요청\n", "expected_changes": "change_id,doc_id,doc_title,section,change_type,before_text,after_text,note\nCHG-001,DOC-001,계약인수 사무처리기준,제4조(보험가입금액 한도),개정,무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.,무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.,한도 상향\nCHG-002,DOC-001,계약인수 사무처리기준,제5조(건강진단 대상),개정,가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.,가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.,연령 기준 하향\nCHG-003,DOC-001,계약인수 사무처리기준,제6조(심사 처리기한),개정,심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.,심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.,처리기한 단축\nCHG-004,DOC-001,계약인수 사무처리기준,제9조의2(전자청약 심사),신설,,전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.,전자청약 대응\nCHG-005,DOC-001,계약인수 사무처리기준,제11조(팩스 접수),삭제,팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.,,팩스 접수 폐지\nCHG-006,DOC-002,보험금지급심사 업무매뉴얼,제3조(소액 청구 처리),개정,청구금액 50만원 이하 건은 간이 심사로 처리한다.,청구금액 100만원 이하 건은 간이 심사로 처리한다.,간이심사 기준 상향\nCHG-007,DOC-002,보험금지급심사 업무매뉴얼,제4조(지급 기한),개정,서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.,서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.,지급기한 단축\nCHG-008,DOC-002,보험금지급심사 업무매뉴얼,제5조(현장 조사 대상),개정,청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.,청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.,조사 대상 기간 확대\nCHG-009,DOC-002,보험금지급심사 업무매뉴얼,제8조의2(민원 이력 확인),신설,,이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.,민원 이력 연계\nCHG-010,DOC-002,보험금지급심사 업무매뉴얼,제9조(우편 발송 대장),삭제,우편 발송 건은 수기 대장에 기록하여 관리한다.,,수기 대장 폐지\nCHG-011,DOC-003,심사업무운영 내규,제3조(전결 권한),개정,팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.,팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.,전결 한도 상향\nCHG-012,DOC-003,심사업무운영 내규,제4조(교육 이수),개정,심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.,심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.,교육 시간 확대\nCHG-013,DOC-003,심사업무운영 내규,제5조(기준 문서 점검),개정,심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.,심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.,점검 주기 단축\nCHG-014,DOC-003,심사업무운영 내규,제6조의2(AI 도구 활용),신설,,업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.,AI 활용 원칙\nCHG-015,DOC-003,심사업무운영 내규,제8조(수기 대장 관리),삭제,심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.,,수기 대장 폐지\n"}, "mails": [{"name": "알림메일_샘플1.txt", "text": "제목: [가나다생명] 계약인수 사무처리기준 변경 안내\n\n담당자A님,\n구독 중인 '사무처리기준' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n첨부된 변경대비표를 확인해 주세요.\n\n※ 본 메일은 가상 데이터입니다.\n"}, {"name": "알림메일_샘플2.txt", "text": "제목: [가나다생명] 심사업무운영 내규 변경 안내\n\n담당자C님,\n구독 중인 '내규' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n변경 내용은 시스템에서 확인할 수 있습니다.\n\n※ 본 메일은 가상 데이터입니다.\n"}]};
+const TYPES = ["개정", "신설", "삭제"];
+const STORE_KEY = "ganada-manual-update-v1";
+
+/* ---------- 유틸 ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = s => String(s ?? "").replace(/\s+/g, " ").trim();
+const tight = s => String(s ?? "").replace(/\s+/g, "");
+const today = () => new Date().toISOString().slice(0, 10);
+const nowStr = () => { const d = new Date(); return d.toISOString().slice(0, 10) + " " + d.toTimeString().slice(0, 5); };
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2200); }
+
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(f); f = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += c;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  const [head, ...body] = rows.filter(r => r.some(v => v.trim() !== ""));
+  return body.map(r => Object.fromEntries(head.map((h, i) => [h.trim(), (r[i] ?? "").trim()])));
+}
+
+/* ---------- 상태 ---------- */
+const state = {
+  docsMeta: [], users: [], keywords: [], expected: [],
+  library: [],      // {name, text, uploaded}
+  runs: [],         // 비교 결과
+  notices: [],      // 알림
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library",
+};
+function loadRef() {
+  state.docsMeta = parseCSV(SAMPLE.csv.documents);
+  state.users = parseCSV(SAMPLE.csv.users);
+  state.keywords = parseCSV(SAMPLE.csv.classification_keywords);
+  state.expected = parseCSV(SAMPLE.csv.expected_changes);
+}
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      library: state.library.filter(f => f.uploaded), runs: state.runs, notices: state.notices,
+      users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta,
+    }));
+  } catch (e) { /* 저장 불가 환경: 무시 */ }
+}
+function restore() {
+  try {
+    const d = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (!d) return false;
+    Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
+    ["users", "keywords", "expected", "docsMeta"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
+    state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })).concat(d.library || []);
+    return state.runs.length > 0;
+  } catch (e) { return false; }
+}
+
+/* ---------- 문서 해석: 메타·분류·조항 ---------- */
+const ART_RE = /^\s*(제\s*(\d+)\s*조(?:\s*의\s*(\d+))?)\s*(?:\(([^)]*)\))?\s*(.*)$/;
+
+function parseDoc(file) {
+  const lines = file.text.replace(/\r/g, "").split("\n");
+  const preamble = [], articles = [];
+  let cur = null;
+  for (const line of lines) {
+    const m = line.match(ART_RE);
+    if (m) {
+      cur = { key: `제${m[2]}조` + (m[3] ? `의${m[3]}` : ""), num: +m[2], sub: +(m[3] || 0), title: norm(m[4] || ""), body: norm(m[5]) };
+      articles.push(cur);
+    } else if (line.trim()) {
+      if (cur) cur.body = norm(cur.body + " " + line); else preamble.push(line.trim());
+    }
+  }
+  const head = preamble.join(" ");
+  const meta = state.docsMeta.find(d => d.file_name === file.name);
+  const version = meta?.version || (head.match(/\((v[\d.]+)/) || file.name.match(/_(v[\d.]+)/) || [])[1] || "";
+  const eff = meta?.effective_date || (head.match(/시행일\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || "";
+  const title = meta?.title || (head.match(/\]\s*(.+?)\s*\(v/) || [])[1]
+    || file.name.replace(/\.(txt|docx)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
+  return { name: file.name, title: norm(title), version, eff, meta, articles, preamble: head, cls: classify(file.name, file.text) };
+}
+
+function classify(name, text) {
+  const score = {}, hits = {};
+  for (const { doc_type, keyword } of state.keywords) {
+    if (!keyword) continue;
+    const inName = name.includes(keyword) ? 3 : 0;
+    const inBody = text.split(keyword).length - 1;
+    if (inName + inBody) {
+      score[doc_type] = (score[doc_type] || 0) + inName + Math.min(inBody, 5);
+      (hits[doc_type] ||= []).push(keyword);
+    }
+  }
+  const best = Object.entries(score).sort((a, b) => b[1] - a[1])[0];
+  return best ? { type: best[0], score: best[1], hits: hits[best[0]] } : { type: "미분류", score: 0, hits: [] };
+}
+
+function versionNum(v) { return (v.match(/[\d.]+/)?.[0] || "0").split(".").map(Number).reduce((a, n, i) => a + n / Math.pow(1000, i), 0); }
+
+function groupLibrary() {
+  const parsed = state.library.map(parseDoc);
+  const groups = new Map();
+  for (const d of parsed) {
+    const key = d.articles.length ? d.title : "__single__" + d.name;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  }
+  return [...groups.values()].map(list => list.sort((a, b) => versionNum(a.version) - versionNum(b.version)));
+}
+
+/* ---------- 비교 ---------- */
+function tokenDiff(a, b) {
+  const A = a.split(" "), B = b.split(" ");
+  const n = A.length, m = B.length;
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i][j] = A[i] === B[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ops = []; let i = 0, j = 0;
+  while (i < n || j < m) {
+    if (i < n && j < m && A[i] === B[j]) { ops.push(["=", A[i]]); i++; j++; }
+    else if (j < m && (i === n || L[i][j + 1] >= L[i + 1][j])) { ops.push(["+", B[j]]); j++; }
+    else { ops.push(["-", A[i]]); i++; }
+  }
+  return ops;
+}
+function diffHtml(ops, side) {
+  return ops.filter(([o]) => o === "=" || o === (side === "old" ? "-" : "+"))
+    .map(([o, w]) => o === "=" ? esc(w) : side === "old" ? `<del>${esc(w)}</del>` : `<ins>${esc(w)}</ins>`).join(" ");
+}
+function autoNote(ops) {
+  const pairs = []; let del = [], add = [];
+  const flush = () => { if (del.length || add.length) pairs.push(`${del.join(" ") || "∅"} → ${add.join(" ") || "∅"}`); del = []; add = []; };
+  for (const [o, w] of ops) { if (o === "=") flush(); else (o === "-" ? del : add).push(w); }
+  flush();
+  return pairs.join(", ");
+}
+
+function compareDocs(oldDoc, newDoc) {
+  const O = new Map(oldDoc.articles.map(a => [a.key, a]));
+  const N = new Map(newDoc.articles.map(a => [a.key, a]));
+  const keys = [...new Set([...O.keys(), ...N.keys()])];
+  const ref = k => (N.get(k) || O.get(k));
+  keys.sort((x, y) => ref(x).num - ref(y).num || ref(x).sub - ref(y).sub);
+  const changes = [];
+  for (const k of keys) {
+    const o = O.get(k), n = N.get(k);
+    if (o && n) {
+      if (o.body === n.body && o.title === n.title) continue;
+      const ops = tokenDiff(o.body, n.body);
+      const note = o.title !== n.title ? `조문 제목 변경(${o.title} → ${n.title})` + (o.body !== n.body ? ", " + autoNote(ops) : "") : autoNote(ops);
+      changes.push({ section: `${k}(${n.title})`, type: "개정", before: o.body, after: n.body, note, auto: note });
+    } else if (n) {
+      changes.push({ section: `${k}(${n.title})`, type: "신설", before: "", after: n.body, note: "조항 신설", auto: "조항 신설" });
+    } else {
+      changes.push({ section: `${k}(${o.title})`, type: "삭제", before: o.body, after: "", note: "조항 삭제", auto: "조항 삭제" });
+    }
+  }
+  return { changes, total: keys.length };
+}
+
+function baseDocId(newDoc) {
+  return (newDoc.meta?.doc_id || "").replace(/-\d+$/, "") || "UPL-" + tight(newDoc.title).slice(0, 12);
+}
+
+function runGroup(list) {
+  if (list.length < 2) return null;
+  const oldDoc = list[list.length - 2], newDoc = list[list.length - 1];
+  const { changes, total } = compareDocs(oldDoc, newDoc);
+  const docId = baseDocId(newDoc);
+  const run = {
+    id: docId + "@" + newDoc.version, docId, title: newDoc.title, docType: newDoc.cls.type, hits: newDoc.cls.hits,
+    oldName: oldDoc.name, newName: newDoc.name, oldVer: oldDoc.version, newVer: newDoc.version,
+    eff: newDoc.eff || today(), owner: newDoc.meta?.owner_name || "", detectedAt: nowStr(),
+    total, changes: changes.map((c, i) => ({ ...c, id: `CHG-${docId}-${String(i + 1).padStart(2, "0")}` })),
+  };
+  state.runs = state.runs.filter(r => r.id !== run.id).concat(run);
+  notify(run);
+  return run;
+}
+
+function counts(changes) { const c = { 개정: 0, 신설: 0, 삭제: 0 }; changes.forEach(x => c[x.type]++); return c; }
+
+/* ---------- 알림 ---------- */
+function notify(run) {
+  if (!run.changes.length) return;
+  const c = counts(run.changes);
+  for (const u of state.users) {
+    const subs = (u.subscribed_types || "").split("|").map(s => s.trim());
+    if (!subs.includes(run.docType)) continue;
+    const id = `${u.user_id}:${run.id}`;
+    state.notices = state.notices.filter(n => n.id !== id);
+    state.notices.unshift({
+      id, userId: u.user_id, userName: u.name, email: u.email, runId: run.id, at: run.detectedAt, read: false,
+      subject: `[가나다생명] ${run.title} 변경 안내`,
+      body: `${u.name}님,\n구독 중인 '${run.docType}' 문서(${run.newVer})에 변경이 감지되었습니다.\n- 개정 ${c.개정}건, 신설 ${c.신설}건, 삭제 ${c.삭제}건\n- 시행일: ${run.eff}\n첨부된 변경대비표를 확인해 주세요.\n\n` +
+        run.changes.map(x => `· [${x.type}] ${x.section}${x.note ? " — " + x.note : ""}`).join("\n") +
+        `\n\n※ 본 메일은 가상 데이터입니다.`,
+    });
+  }
+}
+
+/* ---------- 검증 ---------- */
+function verify() {
+  const docIds = [...new Set(state.expected.map(e => e.doc_id))];
+  const rows = [], perDoc = [];
+  for (const id of docIds) {
+    const exp = state.expected.filter(e => e.doc_id === id);
+    const run = state.runs.find(r => r.docId === id);
+    const got = run ? run.changes.slice() : [];
+    const used = new Set();
+    let ok = 0;
+    for (const e of exp) {
+      const sameSec = got.findIndex((g, i) => !used.has(i) && tight(g.section) === tight(e.section));
+      let status, g = null;
+      if (sameSec < 0) status = "누락";
+      else {
+        used.add(sameSec); g = got[sameSec];
+        if (g.type !== e.change_type) status = "유형 불일치";
+        else if (norm(g.before) !== norm(e.before_text) || norm(g.after) !== norm(e.after_text)) status = "내용 불일치";
+        else { status = "일치"; ok++; }
+      }
+      rows.push({ doc: e.doc_title, section: e.section, expType: e.change_type, gotType: g?.type || "", status, note: e.note });
+    }
+    got.forEach((g, i) => { if (!used.has(i)) rows.push({ doc: run.title, section: g.section, expType: "", gotType: g.type, status: "오탐", note: g.note }); });
+    perDoc.push({ id, title: exp[0]?.doc_title || id, expected: exp.length, detected: got.length, ok, ran: !!run });
+  }
+  const exp = perDoc.reduce((a, d) => a + d.expected, 0), ok = perDoc.reduce((a, d) => a + d.ok, 0), det = perDoc.reduce((a, d) => a + d.detected, 0);
+  return { rows, perDoc, recall: exp ? ok / exp : 0, precision: det ? ok / det : 0, exp, ok, det };
+}
+
+/* ---------- 렌더링 ---------- */
+const stamp = t => `<span class="stamp t-${esc(t)}">${esc(t)}</span>`;
+const pct = x => (x * 100).toFixed(1) + "%";
+
+function renderLibrary() {
+  const groups = groupLibrary();
+  $("#libCount").textContent = `파일 ${state.library.length}개 · 문서 ${groups.length}종`;
+  $("#groups").innerHTML = groups.map((list, gi) => {
+    const last = list[list.length - 1];
+    const pair = list.length >= 2;
+    const run = pair && state.runs.find(r => r.newName === last.name && r.oldName === list[list.length - 2].name);
+    const typeCls = last.cls.type === "미분류" ? "t-none" : "t-ok";
+    return `<div class="group">
+      <div style="display:grid;gap:6px;min-width:0">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+          <h3>${esc(last.articles.length ? last.title : last.name)}</h3>
+          <span class="stamp ${typeCls}">${esc(last.cls.type)}</span>
+          ${run ? `<span class="muted">변경 ${run.changes.length}건 감지</span>` : ""}
+        </div>
+        <div class="files">${list.map(d => `<span class="file">${esc(d.name)}${d.version ? " · " + esc(d.version) : ""}${d.articles.length ? ` · ${d.articles.length}개 조항` : ""}</span>`).join("")}</div>
+        <p class="kw">${last.cls.hits.length ? "분류 근거 키워드: " + last.cls.hits.map(esc).join(", ") : "일치하는 분류 키워드가 없어 미분류로 둡니다."}${!pair && last.articles.length ? " · 비교할 다른 버전이 없습니다." : ""}${!last.articles.length ? " · 조항(제N조) 구조가 없어 비교 대상에서 제외합니다." : ""}</p>
+      </div>
+      <div>${pair ? `<button class="btn ${run ? "" : "primary"}" data-run="${gi}">${run ? "대비표 보기" : `${esc(list[list.length - 2].version)} → ${esc(last.version)} 비교`}</button>` : ""}</div>
+    </div>`;
+  }).join("") || `<p class="muted">아직 문서가 없습니다. 위에서 파일을 올려 주세요.</p>`;
+  $("#groups").querySelectorAll("[data-run]").forEach(b => b.onclick = () => {
+    const list = groups[+b.dataset.run];
+    const existing = state.runs.find(r => r.newName === list[list.length - 1].name && r.oldName === list[list.length - 2].name);
+    const run = existing || runGroup(list);
+    state.currentRun = run.id; save(); renderAll(); setTab("changes");
+  });
+}
+
+function renderChanges() {
+  const runs = state.runs;
+  if (!state.currentRun || !runs.find(r => r.id === state.currentRun)) state.currentRun = runs[0]?.id || null;
+  $("#runs").innerHTML = runs.map(r => `<button aria-pressed="${r.id === state.currentRun}" data-id="${esc(r.id)}">${esc(r.title)} <span class="muted">${esc(r.newVer)}</span></button>`).join("")
+    + (runs.length > 1 ? `<button aria-pressed="${state.currentRun === "__all__"}" data-id="__all__">통합 정리본</button>` : "");
+  $("#runs").querySelectorAll("button").forEach(b => b.onclick = () => { state.currentRun = b.dataset.id; renderChanges(); });
+  const el = $("#runDetail");
+  if (!runs.length) { el.innerHTML = `<div class="box"><p class="muted">비교한 문서가 없습니다. 문서함에서 ‘전체 신구 비교 실행’을 누르세요.</p></div>`; return; }
+  if (state.currentRun === "__all__") { el.innerHTML = renderUnified(); return; }
+  const r = runs.find(x => x.id === state.currentRun);
+  const c = counts(r.changes);
+  const ruleOps = r.changes.map(x => x.type === "개정" ? tokenDiff(x.before, x.after) : null);
+  el.innerHTML = `
+    <div class="facts">
+      <div><span class="eyebrow">문서</span><b style="font-family:var(--font-body)">${esc(r.title)}</b><span class="muted mono">${esc(r.docId)}</span></div>
+      <div><span class="eyebrow">문서유형</span><b style="font-family:var(--font-body)">${esc(r.docType)}</b><span class="muted">${esc(r.hits.join(", ") || "키워드 없음")}</span></div>
+      <div><span class="eyebrow">버전 · 시행일</span><b>${esc(r.oldVer)} → ${esc(r.newVer)}</b><span class="muted mono">${esc(r.eff)}</span></div>
+      <div><span class="eyebrow">변경 건수</span><b>${r.changes.length}건</b><span class="muted">개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}</span></div>
+      <div><span class="eyebrow">변경률</span><b>${pct(r.changes.length / (r.total || 1))}</b><span class="muted">${r.changes.length} / 전체 ${r.total}개 조항</span></div>
+    </div>
+    <div class="box">
+      <div class="bar"><h2>변경대비표</h2><span class="muted">비고는 자동 작성되며 직접 고칠 수 있습니다.</span></div>
+      <div class="scroll"><table class="cmp">
+        <thead><tr><th>조항</th><th>현행</th><th>개정</th><th>변경유형</th><th>비고</th></tr></thead>
+        <tbody>${r.changes.map((x, i) => `<tr>
+          <td class="clause">${esc(x.section)}</td>
+          <td class="txt">${ruleOps[i] ? diffHtml(ruleOps[i], "old") : x.before ? `<del>${esc(x.before)}</del>` : `<span class="muted">(신설)</span>`}</td>
+          <td class="txt">${ruleOps[i] ? diffHtml(ruleOps[i], "new") : x.after ? `<ins>${esc(x.after)}</ins>` : `<span class="muted">(삭제)</span>`}</td>
+          <td>${stamp(x.type)}</td>
+          <td class="note"><input type="text" id="note-${esc(x.id)}" data-i="${i}" value="${esc(x.note)}" aria-label="${esc(x.section)} 비고"></td>
+        </tr>`).join("") || `<tr class="empty"><td colspan="5">변경된 조항이 없습니다.</td></tr>`}</tbody>
+      </table></div>
+      <p class="muted">원본: <span class="mono">${esc(r.oldName)}</span> → <span class="mono">${esc(r.newName)}</span> · 감지 ${esc(r.detectedAt)}${r.owner ? " · 문서 담당 " + esc(r.owner) : ""}</p>
+    </div>`;
+  el.querySelectorAll("td.note input").forEach(inp => inp.onchange = () => { r.changes[+inp.dataset.i].note = inp.value; save(); });
+}
+
+function renderUnified() {
+  const all = state.runs.flatMap(r => r.changes.map(x => ({ ...x, title: r.title, ver: r.newVer })));
+  const c = counts(all);
+  return `<div class="box">
+    <div class="bar"><h2>통합 정리본</h2><span class="muted">문서 ${state.runs.length}종 · 개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}</span></div>
+    <div class="scroll"><table>
+      <thead><tr><th>문서</th><th>조항</th><th>현행</th><th>개정</th><th>변경유형</th><th>비고</th></tr></thead>
+      <tbody>${all.map(x => `<tr><td>${esc(x.title)} <span class="muted mono">${esc(x.ver)}</span></td><td class="clause">${esc(x.section)}</td><td class="txt">${esc(x.before)}</td><td class="txt">${esc(x.after)}</td><td>${stamp(x.type)}</td><td>${esc(x.note)}</td></tr>`).join("")}</tbody>
+    </table></div></div>`;
+}
+
+function renderVerify() {
+  const v = verify();
+  const pass = v.recall >= 0.9;
+  $("#verifyBody").innerHTML = `
+    <div class="verdict">
+      <div><span class="eyebrow">정확도 (정답 대비 일치)</span><div class="big">${pct(v.recall)}</div></div>
+      <div><span class="eyebrow">정밀도 (감지 대비 일치)</span><div class="big">${pct(v.precision)}</div></div>
+      <div><span class="eyebrow">건수</span><div class="mono">정답 ${v.exp} · 감지 ${v.det} · 일치 ${v.ok}</div></div>
+      <div><span class="stamp ${pass ? "t-ok" : "t-bad"}" style="font-size:0.95rem;padding:4px 12px">${pass ? "목표 충족 (90% 이상)" : "목표 미달 (90% 미만)"}</span></div>
+    </div>
+    <div class="box">
+      <h2>문서별 결과</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>문서</th><th class="num">정답</th><th class="num">감지</th><th class="num">일치</th><th>상태</th></tr></thead>
+        <tbody>${v.perDoc.map(d => `<tr><td>${esc(d.title)} <span class="muted mono">${esc(d.id)}</span></td><td class="num">${d.expected}</td><td class="num">${d.detected}</td><td class="num">${d.ok}</td>
+          <td>${!d.ran ? `<span class="stamp t-none">비교 전</span>` : d.ok === d.expected && d.detected === d.expected ? `<span class="stamp t-ok">전부 일치</span>` : `<span class="stamp t-warn">확인 필요</span>`}</td></tr>`).join("")}</tbody>
+      </table></div>
+    </div>
+    <div class="box">
+      <h2>건별 대조</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>문서</th><th>조항</th><th>정답 유형</th><th>감지 유형</th><th>판정</th><th>정답표 비고</th></tr></thead>
+        <tbody>${v.rows.map(r => `<tr><td>${esc(r.doc)}</td><td class="clause">${esc(r.section)}</td><td>${r.expType ? stamp(r.expType) : "—"}</td><td>${r.gotType ? stamp(r.gotType) : "—"}</td>
+          <td><span class="stamp ${r.status === "일치" ? "t-ok" : r.status === "누락" || r.status === "오탐" ? "t-bad" : "t-warn"}">${esc(r.status)}</span></td><td class="muted">${esc(r.note)}</td></tr>`).join("") || `<tr class="empty"><td colspan="6">정답표가 비어 있습니다.</td></tr>`}</tbody>
+      </table></div>
+      <p class="muted">판정 기준: 조항 번호·변경유형·현행/개정 문구가 정답표(expected_changes.csv)와 모두 같으면 일치입니다.</p>
+    </div>`;
+}
+
+function renderInbox() {
+  const unread = state.notices.filter(n => !n.read).length;
+  $("#unread").textContent = unread; $("#unread").hidden = !unread;
+  const sel = $("#userFilter");
+  sel.innerHTML = `<option value="all">전체</option>` + state.users.map(u => `<option value="${esc(u.user_id)}">${esc(u.name)} (${esc(u.team)})</option>`).join("");
+  sel.value = state.userFilter;
+  const list = state.notices.filter(n => state.userFilter === "all" || n.userId === state.userFilter);
+  $("#msgs").innerHTML = list.map(n => `<button class="msg ${n.read ? "" : "unread"}" aria-current="${n.id === state.currentMsg}" data-id="${esc(n.id)}">
+      <span class="subj">${esc(n.subject)}</span><span class="meta">받는 사람 ${esc(n.userName)} · ${esc(n.email)} · ${esc(n.at)}</span></button>`).join("")
+    || `<p class="muted" style="padding:14px">알림이 없습니다. 문서를 비교하면 구독 담당자에게 알림이 쌓입니다.</p>`;
+  $("#msgs").querySelectorAll(".msg").forEach(b => b.onclick = () => {
+    const n = state.notices.find(x => x.id === b.dataset.id); n.read = true; state.currentMsg = n.id; save(); renderInbox();
+  });
+  const cur = state.notices.find(n => n.id === state.currentMsg) || list[0];
+  $("#msgView").innerHTML = cur ? `<div style="display:grid;gap:10px">
+      <div class="bar"><div><h3>${esc(cur.subject)}</h3></div><div><button class="btn small" id="copyMail">본문 복사</button><button class="btn small" id="openRun">변경대비표 열기</button></div></div>
+      <pre class="mail">${esc("받는 사람: " + cur.userName + " <" + cur.email + ">\n제목: " + cur.subject + "\n\n" + cur.body)}</pre></div>` : "";
+  if (cur) {
+    $("#copyMail").onclick = () => copyText("제목: " + cur.subject + "\n\n" + cur.body);
+    $("#openRun").onclick = () => { state.currentRun = cur.runId; renderChanges(); setTab("changes"); };
+  }
+}
+
+function renderStats() {
+  const recs = state.runs.flatMap(r => r.changes.map(x => ({ ...x, month: r.eff.slice(0, 7), year: r.eff.slice(0, 4) })));
+  const agg = key => {
+    const m = new Map();
+    recs.forEach(x => { const k = x[key]; if (!m.has(k)) m.set(k, { 개정: 0, 신설: 0, 삭제: 0 }); m.get(k)[x.type]++; });
+    return [...m.entries()].sort();
+  };
+  const bars = rows => {
+    const max = Math.max(1, ...rows.map(([, c]) => c.개정 + c.신설 + c.삭제));
+    return `<div class="bars">${rows.map(([k, c]) => { const t = c.개정 + c.신설 + c.삭제; return `<div class="barrow"><span class="mono">${esc(k)}</span>
+      <div class="track" title="개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}">${TYPES.map(ty => c[ty] ? `<span class="seg-${ty}" style="width:${c[ty] / max * 100}%"></span>` : "").join("")}</div>
+      <span class="num">${t}건</span></div>`; }).join("") || `<p class="muted">비교 결과가 없습니다.</p>`}</div>`;
+  };
+  const legend = `<div class="legend">${TYPES.map(t => `<span><i class="seg-${t}"></i>${t}</span>`).join("")}</div>`;
+  const docs = Math.max(state.runs.length, 1);
+  $("#statsBody").innerHTML = `
+    <div class="two">
+      <div class="box"><div class="bar"><h2>월별 변경 건수</h2>${legend}</div>${bars(agg("month"))}<p class="muted">기준: 신버전 시행월</p></div>
+      <div class="box"><div class="bar"><h2>연도별 변경 건수</h2>${legend}</div>${bars(agg("year"))}</div>
+    </div>
+    <div class="box">
+      <h2>문서별 변경률</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>문서</th><th>문서유형</th><th>버전</th><th>시행일</th><th class="num">변경 조항</th><th class="num">전체 조항</th><th class="num">변경률</th></tr></thead>
+        <tbody>${state.runs.map(r => `<tr><td>${esc(r.title)}</td><td>${esc(r.docType)}</td><td class="mono">${esc(r.oldVer)} → ${esc(r.newVer)}</td><td class="mono">${esc(r.eff)}</td>
+          <td class="num">${r.changes.length}</td><td class="num">${r.total}</td><td class="num">${pct(r.changes.length / (r.total || 1))}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <p class="muted">변경률 = 변경 조항 수 ÷ 전체 조항 수(신구 합집합) × 100</p>
+    </div>
+    <div class="box">
+      <h2>기대효과 계산</h2>
+      <div class="calc">
+        <label for="cDocs">문서 수 (건/월)<input type="number" id="cDocs" min="0" value="${docs}"></label>
+        <label for="cMin">건당 작업 시간 (분)<input type="number" id="cMin" min="0" value="120"></label>
+        <label for="cRate">자동화 비율 (%)<input type="number" id="cRate" min="0" max="100" value="70"></label>
+        <div><span class="eyebrow">절감 시간</span><div class="big mono" id="cOut" style="font-size:1.4rem"></div></div>
+      </div>
+      <p class="muted">절감 시간 = 문서 수 × 건당 작업 시간 × 자동화 비율</p>
+    </div>`;
+  const calc = () => {
+    const min = (+$("#cDocs").value || 0) * (+$("#cMin").value || 0) * (+$("#cRate").value || 0) / 100;
+    $("#cOut").textContent = `월 ${(min / 60).toFixed(1)}시간 · 연 ${(min * 12 / 60).toFixed(0)}시간`;
+  };
+  ["#cDocs", "#cMin", "#cRate"].forEach(s => $(s).oninput = calc); calc();
+}
+
+function renderRef() {
+  const tbl = (title, rows, cols) => `<div class="box"><h2>${title}</h2><div class="scroll"><table>
+    <thead><tr>${cols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${cols.map(c => `<td>${esc(c === "subscribed_types" ? (r[c] || "").split("|").join(", ") : r[c])}</td>`).join("")}</tr>`).join("")}</tbody></table></div></div>`;
+  const kw = {}; state.keywords.forEach(k => (kw[k.doc_type] ||= []).push(k.keyword));
+  $("#refBody").innerHTML =
+    tbl("담당자 · 구독 유형", state.users, ["user_id", "name", "team", "email", "subscribed_types"]) +
+    tbl("분류 키워드", Object.entries(kw).map(([t, k]) => ({ 문서유형: t, 키워드: k.join(", ") })), ["문서유형", "키워드"]) +
+    tbl("문서 메타", state.docsMeta, ["doc_id", "title", "doc_type", "version", "effective_date", "owner_name"]) +
+    `<div class="box"><h2>정답표</h2><p>${state.expected.length}건 · 개정 ${state.expected.filter(e => e.change_type === "개정").length} · 신설 ${state.expected.filter(e => e.change_type === "신설").length} · 삭제 ${state.expected.filter(e => e.change_type === "삭제").length}</p>
+     <p class="muted">‘정답 검증’ 탭에서 비교 결과와 대조합니다.</p>
+     <h3>알림 메일 샘플</h3>${SAMPLE.mails.map(m => `<pre class="mail">${esc(m.text.trim())}</pre>`).join("")}</div>`;
+}
+
+function renderAll() { renderLibrary(); renderChanges(); renderVerify(); renderInbox(); renderStats(); renderRef(); }
+
+function setTab(t) {
+  state.tab = t;
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
+  document.querySelectorAll("section.panel").forEach(s => s.hidden = s.id !== "tab-" + t);
+  try { localStorage.setItem(STORE_KEY + ":tab", t); } catch (e) {}
+}
+
+/* ---------- 내보내기 ---------- */
+const HEAD = ["조항", "현행", "개정", "변경유형", "비고"];
+function currentRows() {
+  if (state.currentRun === "__all__")
+    return { name: "통합정리본", head: ["문서", ...HEAD], rows: state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])) };
+  const r = state.runs.find(x => x.id === state.currentRun);
+  return r && { name: r.title, head: HEAD, rows: r.changes.map(x => [x.section, x.before, x.after, x.type, x.note]) };
+}
+function copyText(s) {
+  const fallback = () => { const ta = document.createElement("textarea"); ta.value = s; document.body.appendChild(ta); ta.select(); try { document.execCommand("copy"); toast("복사했습니다"); } catch (e) { toast("복사하지 못했습니다. 직접 선택해 복사하세요."); } ta.remove(); };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(s).then(() => toast("복사했습니다. 엑셀에 붙여넣으세요."), fallback); else fallback();
+}
+$("#copyBtn").onclick = () => {
+  const d = currentRows(); if (!d) return toast("먼저 문서를 비교하세요");
+  const cell = v => /[\t\n"]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
+  copyText([d.head, ...d.rows].map(r => r.map(cell).join("\t")).join("\n"));
+};
+$("#xlsxBtn").onclick = () => {
+  if (!window.XLSX) return toast("엑셀 모듈을 불러오지 못했습니다. ‘표 복사’를 사용하세요.");
+  if (!state.runs.length) return toast("먼저 문서를 비교하세요");
+  const wb = XLSX.utils.book_new();
+  const add = (name, head, rows) => {
+    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
+    ws["!cols"] = head.map(h => ({ wch: h === "현행" || h === "개정" ? 50 : h === "조항" ? 24 : h === "비고" ? 30 : 12 }));
+    XLSX.utils.book_append_sheet(wb, ws, name.replace(/[\\/?*[\]:]/g, "").slice(0, 31));
+  };
+  state.runs.forEach(r => add(r.title, HEAD, r.changes.map(x => [x.section, x.before, x.after, x.type, x.note])));
+  if (state.runs.length > 1) add("통합정리본", ["문서", ...HEAD], state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])));
+  try { XLSX.writeFile(wb, `변경대비표_${today()}.xlsx`); toast("엑셀 파일을 만들었습니다"); }
+  catch (e) { toast("이 화면에서는 내려받기가 막혀 있습니다. ‘표 복사’를 사용하세요."); }
+};
+
+/* ---------- 입력 ---------- */
+async function readFile(f) {
+  if (/\.docx$/i.test(f.name)) {
+    if (!window.mammoth) throw new Error("docx 모듈을 불러오지 못했습니다");
+    const { value } = await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() });
+    return value;
+  }
+  const buf = await f.arrayBuffer();
+  try { return new TextDecoder("utf-8", { fatal: true }).decode(buf).replace(/^﻿/, ""); }
+  catch (e) { return new TextDecoder("euc-kr").decode(buf); }
+}
+async function addFiles(files) {
+  let n = 0;
+  for (const f of files) {
+    if (!/\.(txt|docx)$/i.test(f.name)) { toast(`${f.name}: .txt 또는 .docx만 올릴 수 있습니다`); continue; }
+    try {
+      const text = await readFile(f);
+      state.library = state.library.filter(x => x.name !== f.name).concat({ name: f.name, text, uploaded: true }); n++;
+    } catch (e) { toast(`${f.name}: ${e.message}`); }
+  }
+  if (n) { save(); renderAll(); toast(`${n}개 파일을 문서함에 추가했습니다`); }
+}
+$("#fileInput").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
+const drop = $("#drop");
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); addFiles([...e.dataTransfer.files]); };
+
+$("#runAllBtn").onclick = () => {
+  const done = groupLibrary().map(runGroup).filter(Boolean);
+  state.currentRun = done[0]?.id || null; save(); renderAll();
+  toast(`${done.length}개 문서를 비교했습니다 · 변경 ${done.reduce((a, r) => a + r.changes.length, 0)}건`);
+  setTab("changes");
+};
+$("#resetBtn").onclick = () => { boot(true); toast("샘플 데이터로 되돌렸습니다"); };
+$("#readAllBtn").onclick = () => { state.notices.forEach(n => { if (state.userFilter === "all" || n.userId === state.userFilter) n.read = true; }); save(); renderInbox(); };
+$("#userFilter").onchange = e => { state.userFilter = e.target.value; state.currentMsg = null; renderInbox(); };
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setTab(b.dataset.tab));
+
+const csvTargets = { csvUsers: ["users", "user_id"], csvKeywords: ["keywords", "keyword"], csvExpected: ["expected", "change_id"], csvDocs: ["docsMeta", "doc_id"] };
+Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const rows = parseCSV(await readFile(f));
+  if (!rows.length || !(must in rows[0])) return toast(`${f.name}: '${must}' 컬럼이 있는 CSV가 필요합니다`);
+  state[key] = rows; save(); renderAll(); toast(`${f.name}: ${rows.length}행을 반영했습니다`);
+});
+
+/* ---------- 시작 ---------- */
+function boot(reset) {
+  loadRef();
+  state.runs = []; state.notices = []; state.currentRun = null; state.currentMsg = null;
+  state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false }));
+  if (reset || !restore()) {
+    if (reset) { loadRef(); state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })); }
+    groupLibrary().forEach(runGroup);   // 처음 열면 샘플 3세트를 바로 비교해 둔다
+    save();
+  }
+  renderAll();
+}
+boot(false);
+let startTab = "library";
+try { startTab = localStorage.getItem(STORE_KEY + ":tab") || startTab; } catch (e) {}
+if (/^#(library|changes|verify|inbox|stats|ref)$/.test(location.hash)) startTab = location.hash.slice(1);
+setTab(startTab);
+</script>
+</body>
+</html>
