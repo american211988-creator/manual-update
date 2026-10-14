@@ -6,8 +6,14 @@
 
 ## 실행
 
-`app/index.html`을 브라우저로 여세요. 서버 설치가 필요 없고, 처음 열면 샘플 3세트를 자동으로 비교해 둡니다.
+`public/index.html`을 브라우저로 여세요. 서버 설치가 필요 없고, 처음 열면 샘플 3세트를 자동으로 비교해 둡니다.
 (엑셀 내려받기·.docx 읽기만 CDN 라이브러리를 씁니다. 인터넷이 막혀 있으면 ‘표 복사’로 엑셀에 붙여넣으세요.)
+
+## Vercel 배포
+
+빌드 단계 없이 `public/` 폴더를 정적 사이트로 배포합니다 (`vercel.json` 참고).
+Vercel에서 이 저장소를 Import하면 설정을 따로 바꿀 필요가 없습니다. 루트(`/`)에서 앱이 열립니다.
+`public/index.html`은 커밋된 빌드 결과이므로, 소스나 데이터를 고친 뒤에는 반드시 `python3 tools/build.py`를 실행하고 커밋하세요.
 
 ## 화면 구성
 
@@ -24,7 +30,8 @@
 
 - `data/` : 더미 데이터 원본 (신구 문서 3쌍 + 회의록, 정답표, 담당자, 키워드, 메일 샘플, 대비표 양식)
 - `app/src.html` : 앱 소스
-- `app/index.html` : 빌드 결과 (샘플 데이터 포함). `data/`를 고치면 `python3 tools/build.py`로 다시 만드세요.
+- `public/index.html` : 빌드 결과 (샘플 데이터 포함). `data/`나 `app/src.html`을 고치면 `python3 tools/build.py`로 다시 만들어 함께 커밋하세요.
+- `vercel.json` : Vercel 배포 설정
 
 ## 샘플 검증 결과
 

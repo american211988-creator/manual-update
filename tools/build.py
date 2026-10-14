@@ -1,7 +1,7 @@
-"""data/ 폴더의 더미 데이터를 app/src.html 에 넣어 app/index.html 을 만든다.
+"""data/ 폴더의 더미 데이터를 app/src.html 에 넣어 public/index.html 을 만든다.
 
 사용법: python3 tools/build.py
-- app/index.html : 브라우저로 바로 여는 완성본 (오프라인 동작, 엑셀 내보내기만 CDN 필요)
+- public/index.html : 브라우저·Vercel에서 바로 여는 완성본 (오프라인 동작, 엑셀 내보내기만 CDN 필요)
 """
 import json
 from pathlib import Path
@@ -34,8 +34,8 @@ def main() -> None:
     out = src.replace("/*__SAMPLE_DATA__*/null", payload)
     if out == src:
         raise SystemExit("placeholder not found in app/src.html")
-    (ROOT / "app" / "index.html").write_text(out, encoding="utf-8")
-    print(f"wrote app/index.html ({len(out):,} bytes)")
+    (ROOT / "public" / "index.html").write_text(out, encoding="utf-8")
+    print(f"wrote public/index.html ({len(out):,} bytes)")
 
 
 if __name__ == "__main__":
