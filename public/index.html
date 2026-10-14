@@ -109,6 +109,13 @@ ins { background: var(--new-bg); color: var(--new); text-decoration: none; font-
 @media (max-width: 560px) { .group { grid-template-columns: minmax(0, 1fr); } }
 
 .runs { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 14px; background: var(--surface); }
+.filters label { display: grid; gap: 4px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+.filters select { min-width: 150px; max-width: 100%; }
+.filters #fRun { min-width: 240px; }
+.filters #fCount { margin-left: auto; align-self: center; }
+@media (max-width: 560px) { .filters label, .filters select, .filters #fRun { width: 100%; min-width: 0; } .filters #fCount { margin-left: 0; } }
+.runs .more { border-style: dashed; color: var(--muted); }
 .runs button { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: var(--r); padding: 6px 10px; cursor: pointer; font: 500 0.85rem var(--font-body); }
 .runs button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-weak); }
 
@@ -259,6 +266,13 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
 
   <!-- 2. 변경대비표 -->
   <section class="panel" id="tab-changes" hidden>
+    <div class="filters" id="runFilters" role="search" aria-label="변경대비표 조회">
+      <label for="fType">문서유형<select id="fType"></select></label>
+      <label for="fMonth">시행월<select id="fMonth"></select></label>
+      <label for="fRun">문서 바로 열기<select id="fRun"></select></label>
+      <button class="btn small" id="fReset" type="button">필터 초기화</button>
+      <span class="muted" id="fCount"></span>
+    </div>
     <div class="bar">
       <div class="runs" id="runs"></div>
       <div>
@@ -408,7 +422,7 @@ const state = {
   library: [],      // {name, text, uploaded}
   runs: [],         // 비교 결과
   notices: [],      // 알림
-  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true,
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null,
 };
 function loadRef() {
   state.docsMeta = parseCSV(SAMPLE.csv.documents);
@@ -672,16 +686,48 @@ function renderLibrary() {
   });
 }
 
+/* 변경대비표 조회 필터: 문서유형·시행월로 좁힌 비교 결과 (버튼·통합 정리본·내려받기가 모두 이 목록을 따른다) */
+const RUN_BUTTONS = 8;
+function viewRuns() {
+  const f = state.runFilter;
+  return state.runs.filter(r => (f.type === "all" || r.docType === f.type) && (f.month === "all" || r.eff.slice(0, 7) === f.month));
+}
+function renderRunFilters(runs) {
+  const f = state.runFilter, all = state.runs;
+  const opt = (v, label, cur) => `<option value="${esc(v)}"${v === cur ? " selected" : ""}>${esc(label)}</option>`;
+  const types = [...new Set(all.map(r => r.docType))].sort();
+  const months = [...new Set(all.map(r => r.eff.slice(0, 7)))].sort().reverse();
+  if (f.type !== "all" && !types.includes(f.type)) f.type = "all";
+  if (f.month !== "all" && !months.includes(f.month)) f.month = "all";
+  $("#fType").innerHTML = opt("all", `전체 (${all.length})`, f.type) + types.map(t => opt(t, `${t} (${all.filter(r => r.docType === t).length})`, f.type)).join("");
+  $("#fMonth").innerHTML = opt("all", "전체", f.month) + months.map(m => opt(m, m, f.month)).join("");
+  $("#fRun").innerHTML = opt("", `— ${runs.length}건 중 선택 —`, "") + (runs.length > 1 ? opt("__all__", "통합 정리본", "") : "") +
+    runs.map(r => opt(r.id, `${r.title} ${r.newVer} · ${r.eff} · ${r.changes.length}건`, "")).join("");
+  $("#fRun").value = runs.some(r => r.id === state.currentRun) || state.currentRun === "__all__" ? state.currentRun : "";
+  $("#fCount").textContent = f.type === "all" && f.month === "all" ? `비교 결과 ${all.length}건` : `전체 ${all.length}건 중 ${runs.length}건`;
+  $("#fReset").hidden = f.type === "all" && f.month === "all";
+}
 function renderChanges() {
-  const runs = state.runs;
+  const runs = viewRuns();
+  renderRunFilters(runs);
   const validAll = state.currentRun === "__all__" && runs.length > 1;
   if (!validAll && !runs.find(r => r.id === state.currentRun)) state.currentRun = runs[0]?.id || null;
-  $("#runs").innerHTML = runs.map(r => `<button aria-pressed="${r.id === state.currentRun}" data-id="${esc(r.id)}">${esc(r.title)} <span class="muted">${esc(r.newVer)}</span></button>`).join("")
-    + (runs.length > 1 ? `<button aria-pressed="${state.currentRun === "__all__"}" data-id="__all__">통합 정리본</button>` : "");
-  $("#runs").querySelectorAll("button").forEach(b => b.onclick = () => { state.currentRun = b.dataset.id; renderChanges(); });
+  // 버튼은 최근 것부터 8개만, 나머지는 '더 보기' (선택한 문서는 항상 보이게)
+  let shown = state.showAllRuns ? runs : runs.slice(0, RUN_BUTTONS);
+  const cur = runs.find(r => r.id === state.currentRun);
+  if (cur && !shown.includes(cur)) shown = [...shown, cur];
+  const hidden = runs.length - shown.length;
+  $("#runs").innerHTML = shown.map(r => `<button aria-pressed="${r.id === state.currentRun}" data-id="${esc(r.id)}">${esc(r.title)} <span class="muted">${esc(r.newVer)}</span></button>`).join("")
+    + (hidden > 0 ? `<button class="more" data-more="1">더 보기 (${hidden})</button>` : state.showAllRuns && runs.length > RUN_BUTTONS ? `<button class="more" data-more="0">접기</button>` : "")
+    + (runs.length > 1 ? `<button aria-pressed="${state.currentRun === "__all__"}" data-id="__all__">통합 정리본${runs.length < state.runs.length ? ` (${runs.length})` : ""}</button>` : "");
+  $("#runs").querySelectorAll("button").forEach(b => b.onclick = () => {
+    if (b.dataset.more) state.showAllRuns = b.dataset.more === "1"; else state.currentRun = b.dataset.id;
+    state.confirmDelete = null; renderChanges();
+  });
   const el = $("#runDetail");
-  if (!runs.length) { el.innerHTML = `<div class="box"><p class="muted">비교한 문서가 없습니다. 문서함에서 ‘전체 신구 비교 실행’을 누르세요.</p></div>`; return; }
-  if (state.currentRun === "__all__") { el.innerHTML = renderUnified(); return; }
+  if (!state.runs.length) { el.innerHTML = `<div class="box"><p class="muted">비교한 문서가 없습니다. 문서함에서 ‘전체 신구 비교 실행’을 누르세요.</p></div>`; return; }
+  if (!runs.length) { el.innerHTML = `<div class="box"><p class="muted">조건에 맞는 비교 결과가 없습니다. 필터를 바꾸거나 ‘필터 초기화’를 누르세요.</p></div>`; return; }
+  if (state.currentRun === "__all__") { el.innerHTML = renderUnified(runs); return; }
   const r = runs.find(x => x.id === state.currentRun);
   const c = counts(r.changes);
   const ruleOps = r.changes.map(x => x.type === "개정" ? tokenDiff(x.before, x.after) : null);
@@ -705,8 +751,19 @@ function renderChanges() {
           <td class="note"><input type="text" id="note-${esc(x.id)}" data-i="${i}" value="${esc(x.note)}" aria-label="${esc(x.section)} 비고"></td>
         </tr>`).join("") || `<tr class="empty"><td colspan="5">변경된 조항이 없습니다.</td></tr>`}</tbody>
       </table></div>
-      <p class="muted">원본: <span class="mono">${esc(r.oldName)}</span> → <span class="mono">${esc(r.newName)}</span> · 감지 ${esc(r.detectedAt)}${r.owner ? " · 문서 담당 " + esc(r.owner) : ""}</p>
+      <div class="bar"><p class="muted">원본: <span class="mono">${esc(r.oldName)}</span> → <span class="mono">${esc(r.newName)}</span> · 감지 ${esc(r.detectedAt)}${r.owner ? " · 문서 담당 " + esc(r.owner) : ""}</p>
+        <div>${state.confirmDelete === r.id
+          ? `<span class="muted">이 비교 결과와 관련 알림을 목록에서 지웁니다. 원본 파일은 문서함에 남습니다.</span><button class="btn small" id="delCancel">취소</button><button class="btn small" id="delYes" style="border-color:var(--del);color:var(--del)">지우기</button>`
+          : `<button class="btn small" id="delRun">이 비교 결과 목록에서 지우기</button>`}</div></div>
     </div>`;
+  // 쌓인 결과 정리: 두 번 확인 후 지운다 (브라우저 확인창은 쓰지 않음)
+  if ($("#delRun")) $("#delRun").onclick = () => { state.confirmDelete = r.id; renderChanges(); };
+  if ($("#delCancel")) $("#delCancel").onclick = () => { state.confirmDelete = null; renderChanges(); };
+  if ($("#delYes")) $("#delYes").onclick = () => {
+    state.runs = state.runs.filter(x => x.id !== r.id);
+    state.notices = state.notices.filter(n => n.runId !== r.id);
+    state.confirmDelete = null; state.currentRun = null; save(); renderAll(); toast(`${r.title} ${r.newVer} 비교 결과를 지웠습니다`);
+  };
   el.querySelectorAll("td.note input").forEach(inp => inp.onchange = () => {
     const x = r.changes[+inp.dataset.i];
     if (blockIfPII("비고 저장", [{ source: x.section + " 비고", findings: scanPII(inp.value) }])) { inp.value = x.note; return; }
@@ -714,11 +771,11 @@ function renderChanges() {
   });
 }
 
-function renderUnified() {
-  const all = state.runs.flatMap(r => r.changes.map(x => ({ ...x, title: r.title, ver: r.newVer })));
+function renderUnified(runs) {
+  const all = runs.flatMap(r => r.changes.map(x => ({ ...x, title: r.title, ver: r.newVer })));
   const c = counts(all);
   return `<div class="box">
-    <div class="bar"><h2>통합 정리본</h2><span class="muted">문서 ${state.runs.length}종 · 개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}</span></div>
+    <div class="bar"><h2>통합 정리본</h2><span class="muted">문서 ${runs.length}종 · 개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}</span></div>
     <div class="scroll"><table>
       <thead><tr><th>문서</th><th>조항</th><th>현행</th><th>개정</th><th>변경유형</th><th>비고</th></tr></thead>
       <tbody>${all.map(x => `<tr><td>${esc(x.title)} <span class="muted mono">${esc(x.ver)}</span></td><td class="clause">${esc(x.section)}</td><td class="txt">${cellHtml(x, "old")}</td><td class="txt">${cellHtml(x, "new")}</td><td>${stamp(x.type)}</td><td>${esc(x.note)}</td></tr>`).join("")}</tbody>
@@ -892,7 +949,7 @@ function diffSegs(x, side) {
 }
 function currentRows() {
   if (state.currentRun === "__all__")
-    return { name: "통합정리본", head: ["문서", ...HEAD], rows: state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])) };
+    return { name: "통합정리본", head: ["문서", ...HEAD], rows: viewRuns().flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])) };
   const r = state.runs.find(x => x.id === state.currentRun);
   return r && { name: r.title, head: HEAD, rows: r.changes.map(x => [x.section, x.before, x.after, x.type, x.note]) };
 }
@@ -942,16 +999,17 @@ function buildXlsx(sheets) {
   ], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 $("#xlsxBtn").onclick = () => {
-  if (!state.runs.length) return toast("먼저 문서를 비교하세요");
-  const sheets = state.runs.map(r => {
+  const vr = viewRuns();
+  if (!vr.length) return toast(state.runs.length ? "조건에 맞는 비교 결과가 없습니다" : "먼저 문서를 비교하세요");
+  const sheets = vr.map(r => {
     const c = counts(r.changes);
-    return { name: r.title, title: `${r.title} 변경대비표`, head: HEAD,
+    return { name: `${r.title} ${r.newVer}`, title: `${r.title} 변경대비표`, head: HEAD,
       meta: `${r.oldVer} → ${r.newVer} · 시행일 ${r.eff} · 문서유형 ${r.docType} · 변경 ${r.changes.length}건 (개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}) · 작성일 ${today()}`,
       rows: r.changes.map(x => [x.section, diffSegs(x, "old"), diffSegs(x, "new"), x.type, x.note]) };
   });
-  if (state.runs.length > 1) sheets.push({ name: "통합정리본", title: "변경대비표 통합 정리본", head: ["문서", ...HEAD],
-    meta: `문서 ${state.runs.length}종 · 변경 ${state.runs.reduce((a, r) => a + r.changes.length, 0)}건 · 작성일 ${today()}`,
-    rows: state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, diffSegs(x, "old"), diffSegs(x, "new"), x.type, x.note])) });
+  if (vr.length > 1) sheets.push({ name: "통합정리본", title: "변경대비표 통합 정리본", head: ["문서", ...HEAD],
+    meta: `문서 ${vr.length}종 · 변경 ${vr.reduce((a, r) => a + r.changes.length, 0)}건 · 작성일 ${today()}`,
+    rows: vr.flatMap(r => r.changes.map(x => [r.title, x.section, diffSegs(x, "old"), diffSegs(x, "new"), x.type, x.note])) });
   let blob;
   try { blob = buildXlsx(sheets); } catch (e) { return toast("엑셀 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
   saveBlob(blob, `변경대비표_${today()}.xlsx`, "엑셀");
@@ -1050,7 +1108,8 @@ async function saveBlob(blob, name, label) {
 $("#docxBtn").onclick = () => {
   if (!state.runs.length) return toast("먼저 문서를 비교하세요");
   // 통합 정리본을 보고 있으면 전체 문서, 아니면 지금 보고 있는 문서만
-  const runs = state.currentRun === "__all__" ? state.runs : state.runs.filter(r => r.id === state.currentRun);
+  const runs = state.currentRun === "__all__" ? viewRuns() : state.runs.filter(r => r.id === state.currentRun);
+  if (!runs.length) return toast("조건에 맞는 비교 결과가 없습니다");
   const name = runs.length === 1 ? `변경대비표_${runs[0].title.replace(/\s+/g, "")}_${runs[0].newVer}.docx` : `변경대비표_통합_${today()}.docx`;
   let blob;
   try { blob = buildDocx(runs); } catch (e) { return toast("워드 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
@@ -1134,6 +1193,10 @@ $("#runAllBtn").onclick = () => {
   toast(`${done.length}개 문서를 비교했습니다 · 변경 ${done.reduce((a, r) => a + r.changes.length, 0)}건`);
   setTab("changes");
 };
+$("#fType").onchange = e => { state.runFilter.type = e.target.value; state.showAllRuns = false; state.currentRun = null; renderChanges(); };
+$("#fMonth").onchange = e => { state.runFilter.month = e.target.value; state.showAllRuns = false; state.currentRun = null; renderChanges(); };
+$("#fRun").onchange = e => { if (e.target.value) { state.currentRun = e.target.value; state.confirmDelete = null; renderChanges(); } };
+$("#fReset").onclick = () => { state.runFilter = { type: "all", month: "all" }; renderChanges(); };
 $("#resetBtn").onclick = () => { boot(true); toast("샘플 데이터로 되돌렸습니다"); };
 $("#readAllBtn").onclick = () => { state.notices.forEach(n => { if (state.userFilter === "all" || n.userId === state.userFilter) n.read = true; }); save(); renderInbox(); };
 $("#userFilter").onchange = e => { state.userFilter = e.target.value; state.currentMsg = null; renderInbox(); };
