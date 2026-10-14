@@ -191,34 +191,6 @@ nav.tabs button[data-tab="verify"][aria-selected="true"] { background: var(--k-l
 nav.tabs button[data-tab="inbox"][aria-selected="true"] { background: var(--rev-bg); }
 nav.tabs button[data-tab="stats"][aria-selected="true"] { background: var(--k-peach); }
 nav.tabs button[data-tab="ref"][aria-selected="true"] { background: var(--new-bg); }
-nav.tabs button[data-tab="chat"][aria-selected="true"] { background: var(--k-coral); }
-
-/* ---------- AI 도우미 ---------- */
-.chat { display: grid; grid-template-rows: auto auto; gap: 12px; }
-.chat-log { display: grid; gap: 12px; align-content: start; min-height: 260px; max-height: min(60vh, 560px); overflow-y: auto; padding: 4px 2px; }
-.msgb { display: grid; gap: 4px; max-width: min(100%, 760px); min-width: 0; }
-.msgb.me { justify-self: end; }
-.msgb .who { font: 1rem var(--font-lcd); letter-spacing: 0.05em; color: var(--muted); }
-.msgb.me .who { justify-self: end; }
-.bubble { padding: 10px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--lcd); color: var(--lcd-fg); overflow-wrap: anywhere; min-width: 0; }
-.msgb.me .bubble { background: var(--k-blue); border-color: var(--ink); box-shadow: inset 0 -2px 0 var(--cap-shadow); color: var(--ink); white-space: pre-wrap; }
-.bubble.err { background: var(--del-bg); border-color: var(--del); color: var(--ink); }
-.bubble p, .bubble ul, .bubble ol, .bubble h4, .bubble .scroll { margin: 0 0 8px; }
-.bubble > :last-child { margin-bottom: 0; }
-.bubble ul, .bubble ol { padding-left: 20px; }
-.bubble h4 { font-size: 0.95rem; }
-.bubble code { font-family: var(--font-data); font-size: 0.85em; background: var(--paper); padding: 0 4px; border-radius: 4px; }
-.bubble table { font-size: 0.82rem; background: var(--surface); }
-.typing { color: var(--lcd-dim); font-family: var(--font-lcd); font-size: 1.1rem; }
-@media (prefers-reduced-motion: no-preference) { .typing::after { content: "▍"; animation: blink 1s steps(1) infinite; } }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chips button { appearance: none; font: 0.84rem var(--font-body); padding: 5px 12px; border-radius: 999px; border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
-.chips button:hover { border-color: var(--ink); }
-.composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
-.composer textarea { font: inherit; resize: vertical; min-height: 46px; max-height: 200px; padding: 10px 12px; border: 1.5px solid var(--ink); border-radius: 12px; background: var(--surface); color: var(--ink); width: 100%; }
-.composer textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
-.chat-off { display: grid; gap: 8px; }
 .badge { background: var(--led); color: #0B2615; border-radius: 9px; }
 
 button.btn, label.btn { background: var(--k-white); padding: 7px 14px; }
@@ -268,7 +240,6 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
       <button role="tab" data-tab="verify">정답 검증</button>
       <button role="tab" data-tab="inbox">알림함 <span class="badge" id="unread" hidden>0</span></button>
       <button role="tab" data-tab="stats">집계</button>
-      <button role="tab" data-tab="chat">AI 도우미</button>
       <button role="tab" data-tab="ref">기준 데이터</button>
     </nav>
   </header>
@@ -328,31 +299,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
     <div id="statsBody"></div>
   </section>
 
-  <!-- 6. AI 도우미 -->
-  <section class="panel" id="tab-chat" hidden>
-    <div class="bar">
-      <div><h2>AI 도우미</h2><span class="muted" id="chatModel">NVIDIA Nemotron 무료 모델 · OpenRouter</span></div>
-      <div>
-        <label class="check" for="chatCtx"><input type="checkbox" id="chatCtx" checked>변경대비표를 함께 보내기</label>
-        <button class="btn" id="chatClear">대화 지우기</button>
-      </div>
-    </div>
-    <div class="notice privacy" role="note">
-      <span class="stamp">AI 사용 주의</span>
-      <p>무료 모델은 입력 내용이 모델 제공사에 저장되거나 학습에 쓰일 수 있습니다. 개인정보·고객정보·사내 기밀은 입력하지 마세요. 개인정보가 탐지되면 전송을 중단합니다. 답변은 참고용이며 원문 기준문서로 확인하세요.</p>
-    </div>
-    <div class="box chat">
-      <div class="chat-log" id="chatLog" aria-live="polite"></div>
-      <div class="chips" id="chatChips"></div>
-      <form class="composer" id="chatForm">
-        <textarea id="chatInput" rows="2" maxlength="2000" placeholder="예: 이번 개정에서 담당자가 꼭 알아야 할 변경 3가지는?" aria-label="질문 입력"></textarea>
-        <button class="btn primary" id="chatSend" type="submit">보내기</button>
-      </form>
-      <p class="muted" style="font-size:0.78rem">Enter로 보내기 · Shift+Enter로 줄바꿈</p>
-    </div>
-  </section>
-
-  <!-- 7. 기준 데이터 -->
+  <!-- 6. 기준 데이터 -->
   <section class="panel" id="tab-ref" hidden>
     <div class="bar">
       <div><h2>기준 데이터</h2><span class="muted">CSV를 올리면 해당 데이터를 교체합니다 (UTF-8, 첫 행은 컬럼명).</span></div>
@@ -888,7 +835,6 @@ function setTab(t) {
   state.tab = t;
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   document.querySelectorAll("section.panel").forEach(s => s.hidden = s.id !== "tab-" + t);
-  if (t === "chat") { renderChat(); checkChat(); }
   try { localStorage.setItem(STORE_KEY + ":tab", t); } catch (e) {}
 }
 
@@ -1029,124 +975,6 @@ $("#docxBtn").onclick = () => {
   saveBlob(blob, name, "워드");
 };
 
-/* ---------- AI 도우미 (Vercel /api/chat → OpenRouter) ---------- */
-const chat = { history: [], busy: false, ctrl: null, status: null };
-const CHAT_HELLO = "안녕하세요. 기준문서 변경관리 AI 도우미입니다. 지금 비교한 변경대비표를 바탕으로 변경 요약, 담당자 안내문, 확인 체크리스트를 만들어 드립니다.";
-const CHAT_CHIPS = [
-  "이번 개정에서 담당자가 꼭 알아야 할 변경 3가지는?",
-  "계약인수 사무처리기준 변경을 담당자에게 보낼 안내문으로 써줘",
-  "신설·삭제된 조항만 표로 정리해줘",
-  "기한이나 금액이 바뀐 조항만 골라줘",
-];
-function chatContext() {
-  if (!$("#chatCtx").checked || !state.runs.length) return "";
-  return state.runs.map(r => {
-    const c = counts(r.changes);
-    return `■ ${r.title} (${r.docType}) ${r.oldVer} → ${r.newVer}, 시행일 ${r.eff}, 변경 ${r.changes.length}건(개정 ${c.개정}·신설 ${c.신설}·삭제 ${c.삭제}), 전체 ${r.total}개 조항\n` +
-      r.changes.map(x => `- [${x.type}] ${x.section}\n  현행: ${x.before || "(없음)"}\n  개정: ${x.after || "(없음)"}${x.note ? `\n  비고: ${x.note}` : ""}`).join("\n");
-  }).join("\n\n").slice(0, 16000);
-}
-function mdLite(src) {   // 굵게·코드·목록·표·소제목만 다루는 작은 마크다운 변환기 (HTML은 모두 이스케이프)
-  const inline = t => esc(t).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/`([^`]+)`/g, "<code>$1</code>");
-  const lines = String(src).replace(/\r/g, "").split("\n"), out = [];
-  for (let i = 0; i < lines.length;) {
-    const l = lines[i];
-    if (/^\s*\|.*\|\s*$/.test(l)) {
-      const rows = []; while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(lines[i++]);
-      const cells = r => r.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
-      const body = rows.filter(r => !/^\s*\|[\s:|-]+\|\s*$/.test(r));
-      if (!body.length) continue;
-      out.push(`<div class="scroll"><table><thead><tr>${cells(body[0]).map(c => `<th>${inline(c)}</th>`).join("")}</tr></thead><tbody>${body.slice(1).map(r => `<tr>${cells(r).map(c => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
-    } else if (/^\s*[-*•]\s+/.test(l)) {
-      const items = []; while (i < lines.length && /^\s*[-*•]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*[-*•]\s+/, ""));
-      out.push(`<ul>${items.map(t => `<li>${inline(t)}</li>`).join("")}</ul>`);
-    } else if (/^\s*\d+[.)]\s+/.test(l)) {
-      const items = []; while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*\d+[.)]\s+/, ""));
-      out.push(`<ol>${items.map(t => `<li>${inline(t)}</li>`).join("")}</ol>`);
-    } else if (/^#{1,6}\s+/.test(l)) { out.push(`<h4>${inline(l.replace(/^#{1,6}\s+/, ""))}</h4>`); i++; }
-    else if (!l.trim()) i++;
-    else { const para = []; while (i < lines.length && lines[i].trim() && !/^\s*([-*•]|\d+[.)]|\||#{1,6})\s*/.test(lines[i])) para.push(lines[i++]); if (!para.length) para.push(lines[i++]); out.push(`<p>${para.map(inline).join("<br>")}</p>`); }
-  }
-  return out.join("");
-}
-function renderChat(streamText) {
-  const log = $("#chatLog");
-  const items = [{ role: "assistant", content: CHAT_HELLO }, ...chat.history];
-  log.innerHTML = items.map(m => m.role === "user"
-    ? `<div class="msgb me"><span class="who">YOU</span><div class="bubble">${esc(m.content)}</div></div>`
-    : `<div class="msgb"><span class="who">NEMOTRON${m.model ? " · " + esc(m.model.replace(/^nvidia\//, "")) : ""}</span><div class="bubble${m.error ? " err" : ""}">${m.error ? esc(m.content) : mdLite(m.content)}</div></div>`).join("")
-    + (streamText !== undefined ? `<div class="msgb"><span class="who">NEMOTRON</span><div class="bubble">${streamText ? mdLite(streamText) : '<span class="typing">생각 중</span>'}</div></div>` : "");
-  log.scrollTop = log.scrollHeight;
-  $("#chatChips").innerHTML = chat.history.length ? "" : CHAT_CHIPS.map(c => `<button type="button">${esc(c)}</button>`).join("");
-  $("#chatChips").querySelectorAll("button").forEach(b => b.onclick = () => { $("#chatInput").value = b.textContent; sendChat(); });
-  $("#chatSend").textContent = chat.busy ? "중지" : "보내기";
-  $("#chatInput").disabled = chat.status === "off";
-}
-async function checkChat() {
-  if (chat.status) return;
-  chat.status = "checking";
-  try {
-    const r = await fetch("api/chat", { method: "GET", headers: { Accept: "application/json" } });
-    const d = await r.json();
-    chat.status = d.configured ? "on" : "nokey";
-    if (d.model) $("#chatModel").textContent = `${d.model.replace(/^nvidia\//, "NVIDIA ")} · OpenRouter`;
-    if (!d.configured) chat.history.push({ role: "assistant", error: true, content: "서버에 OPENROUTER_API_KEY 환경변수가 없습니다. Vercel 프로젝트 Settings → Environment Variables에 추가한 뒤 다시 배포하세요." });
-  } catch (e) {
-    chat.status = "off";
-    chat.history.push({ role: "assistant", error: true, content: "AI 도우미는 Vercel 사이트(https://manual-update.vercel.app)에서만 동작합니다. 이 화면에서는 AI 서버에 연결할 수 없습니다." });
-  }
-  renderChat();
-}
-async function sendChat() {
-  if (chat.busy) { chat.ctrl?.abort(); return; }
-  const input = $("#chatInput"), text = input.value.trim();
-  if (!text) return;
-  if (chat.status === "off") return toast("이 화면에서는 AI 도우미를 쓸 수 없습니다");
-  const context = chatContext();
-  if (blockIfPII("AI 질문 전송", [{ source: "질문 입력", findings: scanPII(text) }])) return;
-  const q = { role: "user", content: text };
-  chat.history.push(q);
-  input.value = ""; chat.busy = true; chat.ctrl = new AbortController(); renderChat("");
-  let answer = "", model = "";
-  try {
-    const r = await fetch("api/chat", {
-      method: "POST", signal: chat.ctrl.signal, headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: chat.history.filter(m => !m.error && !m.failed).map(({ role, content }) => ({ role, content })), context }),
-    });
-    if (!r.ok || !r.body) {
-      let msg = "AI 응답을 받지 못했습니다."; try { msg = (await r.json()).error || msg; } catch (e) {}
-      throw new Error(msg);
-    }
-    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
-    for (;;) {
-      const { value, done } = await reader.read(); if (done) break;
-      buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n"); buf = lines.pop();
-      for (const line of lines) {
-        if (!line.startsWith("data:")) continue;
-        const data = line.slice(5).trim(); if (data === "[DONE]") continue;
-        try {
-          const j = JSON.parse(data);
-          if (j.error) throw new Error(j.error.message || "AI 응답 중 오류가 났습니다.");
-          model = j.model || model;
-          answer += j.choices?.[0]?.delta?.content || "";
-        } catch (e) { if (e.message && !(e instanceof SyntaxError)) throw e; }
-      }
-      renderChat(answer);
-    }
-    chat.history.push({ role: "assistant", content: answer.trim() || "(빈 답변이 왔습니다. 질문을 바꿔 다시 시도해 보세요.)", model });
-  } catch (e) {
-    // 답을 못 받은 질문은 다음 요청에 섞지 않는다
-    if (e.name === "AbortError") { if (answer) chat.history.push({ role: "assistant", content: answer + "\n\n(중지됨)", model }); else q.failed = true; }
-    else { q.failed = true; chat.history.push({ role: "assistant", error: true, content: e.message || "AI 응답을 받지 못했습니다." }); }
-  } finally {
-    chat.busy = false; chat.ctrl = null; renderChat(); input.focus();
-  }
-}
-$("#chatForm").onsubmit = e => { e.preventDefault(); sendChat(); };
-$("#chatInput").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!chat.busy) sendChat(); } };
-$("#chatClear").onclick = () => { chat.ctrl?.abort(); chat.history = chat.history.filter(m => m.error && chat.status !== "on"); renderChat(); };
-
 /* ---------- 입력 ---------- */
 async function readFile(f) {
   if (/\.docx$/i.test(f.name)) {
@@ -1218,7 +1046,7 @@ function boot(reset) {
 boot(false);
 let startTab = "library";
 try { startTab = localStorage.getItem(STORE_KEY + ":tab") || startTab; } catch (e) {}
-if (/^#(library|changes|verify|inbox|stats|chat|ref)$/.test(location.hash)) startTab = location.hash.slice(1);
+if (/^#(library|changes|verify|inbox|stats|ref)$/.test(location.hash)) startTab = location.hash.slice(1);
 setTab(startTab);
 </script>
 </body>

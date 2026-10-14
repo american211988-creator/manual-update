@@ -2,8 +2,5 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "outputDirectory": "public",
-  "cleanUrls": true,
-  "functions": {
-    "api/chat.js": { "maxDuration": 60 }
-  }
+  "cleanUrls": true
 }
