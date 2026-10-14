@@ -140,9 +140,10 @@ pre.mail { margin: 0; white-space: pre-wrap; font: 0.88rem/1.7 var(--font-body);
 .seg-개정 { background: var(--rev); } .seg-신설 { background: var(--new); } .seg-삭제 { background: var(--del); }
 .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
 .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
 .calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
 .calc label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
-.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
 
 .modal { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding-inline: 16px; padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--ink) 45%, transparent); }
 .modal .sheet { width: min(100%, 760px); max-height: 100%; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--del); border-radius: var(--r); padding: 20px; display: grid; gap: 14px; }
@@ -224,7 +225,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
     <div class="lcd">
       <div class="lcd-row"><span class="lcd-org">Hana Life</span><span class="led" aria-hidden="true"></span></div>
       <h1>내규/매뉴얼 변경대비 업데이트<span class="cursor" aria-hidden="true">_</span></h1>
-      <div class="lcd-row lcd-foot"><span id="lcdLeft">P1</span><span id="lcdRight">0</span></div>
+      <div class="lcd-row lcd-foot"><span id="lcdLeft">문서 0 · 변경 0</span><span id="lcdRight">알림 0</span></div>
     </div>
     <div class="notice intro" role="note">
       <span class="stamp">서비스 안내</span>
@@ -247,8 +248,8 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
   <!-- 1. 문서함·분류 -->
   <section class="panel" id="tab-library">
     <div class="drop" id="drop">
-      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.<br>주민등록번호·전화번호·카드번호 같은 개인정보가 들어 있으면 업로드를 중단합니다.</p>
-      <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx">파일 선택</label>
+      <p><strong>문서 파일을 끌어다 놓거나 선택하세요.</strong> .txt, .docx, .pdf 지원 · 같은 문서의 여러 버전을 올리면 자동으로 신구 쌍을 묶습니다.<br>주민등록번호·전화번호·카드번호 같은 개인정보가 들어 있으면 업로드를 중단합니다.</p>
+      <label class="btn"><input type="file" id="fileInput" multiple accept=".txt,.docx,.pdf">파일 선택</label>
     </div>
     <div class="bar">
       <div><h2>문서함</h2><span class="muted" id="libCount"></span></div>
@@ -308,6 +309,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
         <label class="btn"><input type="file" id="csvKeywords" accept=".csv">분류 키워드 CSV</label>
         <label class="btn"><input type="file" id="csvExpected" accept=".csv">정답표 CSV</label>
         <label class="btn"><input type="file" id="csvDocs" accept=".csv">문서 메타 CSV</label>
+        <label class="btn"><input type="file" id="csvHistory" accept=".csv">개정 이력 CSV</label>
       </div>
     </div>
     <div id="refBody" class="two"></div>
@@ -329,10 +331,9 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script>
-const SAMPLE = {"files": [{"name": "계약인수_사무처리기준_v1.0.txt", "text": "[Hana Life 심사부] 계약인수 사무처리기준 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 기준은 Hana Life 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제11조(팩스 접수) 팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "계약인수_사무처리기준_v2.0.txt", "text": "[Hana Life 심사부] 계약인수 사무처리기준 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 기준은 Hana Life 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제9조의2(전자청약 심사) 전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v1.0.txt", "text": "[Hana Life 심사부] 보험금지급심사 업무매뉴얼 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 매뉴얼은 Hana Life 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 50만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제9조(우편 발송 대장) 우편 발송 건은 수기 대장에 기록하여 관리한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v2.0.txt", "text": "[Hana Life 심사부] 보험금지급심사 업무매뉴얼 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 매뉴얼은 Hana Life 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 100만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제8조의2(민원 이력 확인) 이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "심사업무운영_내규_v1.0.txt", "text": "[Hana Life 심사부] 심사업무운영 내규 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 내규는 Hana Life 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제8조(수기 대장 관리) 심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "심사업무운영_내규_v2.0.txt", "text": "[Hana Life 심사부] 심사업무운영 내규 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 내규는 Hana Life 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제6조의2(AI 도구 활용) 업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "회의록_샘플.txt", "text": "[Hana Life 심사부] 주간 회의록 (2026-10-05)\n\n- 안건: 10월 인수심사 현황 공유\n- 참석: 담당자A, 담당자B, 담당자C\n- 결정: 다음 주 교육 일정 확정\n"}], "csv": {"documents": "doc_id,title,doc_type,version,effective_date,owner_name,file_name\nDOC-001-1,계약인수 사무처리기준,사무처리기준,v1.0,2026-01-01,담당자A,계약인수_사무처리기준_v1.0.txt\nDOC-001-2,계약인수 사무처리기준,사무처리기준,v2.0,2026-07-01,담당자A,계약인수_사무처리기준_v2.0.txt\nDOC-002-1,보험금지급심사 업무매뉴얼,업무매뉴얼,v1.0,2026-01-01,담당자B,보험금지급심사_업무매뉴얼_v1.0.txt\nDOC-002-2,보험금지급심사 업무매뉴얼,업무매뉴얼,v2.0,2026-07-01,담당자B,보험금지급심사_업무매뉴얼_v2.0.txt\nDOC-003-1,심사업무운영 내규,내규,v1.0,2026-01-01,담당자C,심사업무운영_내규_v1.0.txt\nDOC-003-2,심사업무운영 내규,내규,v2.0,2026-07-01,담당자C,심사업무운영_내규_v2.0.txt\n", "users": "user_id,name,team,email,subscribed_types\nU01,담당자A,심사1팀,a@example.com,사무처리기준|내규\nU02,담당자B,심사1팀,b@example.com,업무매뉴얼\nU03,담당자C,심사2팀,c@example.com,내규|업무매뉴얼\nU04,담당자D,심사2팀,d@example.com,사무처리기준\nU05,팀장E,심사부,e@example.com,사무처리기준|업무매뉴얼|내규\n", "classification_keywords": "doc_type,keyword\n사무처리기준,사무처리\n사무처리기준,인수기준\n사무처리기준,처리기준\n업무매뉴얼,업무매뉴얼\n업무매뉴얼,지급심사\n업무매뉴얼,매뉴얼\n내규,내규\n내규,운영규정\n내규,전결\n품의문,품의\n품의문,결재요청\n", "expected_changes": "change_id,doc_id,doc_title,section,change_type,before_text,after_text,note\nCHG-001,DOC-001,계약인수 사무처리기준,제4조(보험가입금액 한도),개정,무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.,무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.,한도 상향\nCHG-002,DOC-001,계약인수 사무처리기준,제5조(건강진단 대상),개정,가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.,가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.,연령 기준 하향\nCHG-003,DOC-001,계약인수 사무처리기준,제6조(심사 처리기한),개정,심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.,심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.,처리기한 단축\nCHG-004,DOC-001,계약인수 사무처리기준,제9조의2(전자청약 심사),신설,,전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.,전자청약 대응\nCHG-005,DOC-001,계약인수 사무처리기준,제11조(팩스 접수),삭제,팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.,,팩스 접수 폐지\nCHG-006,DOC-002,보험금지급심사 업무매뉴얼,제3조(소액 청구 처리),개정,청구금액 50만원 이하 건은 간이 심사로 처리한다.,청구금액 100만원 이하 건은 간이 심사로 처리한다.,간이심사 기준 상향\nCHG-007,DOC-002,보험금지급심사 업무매뉴얼,제4조(지급 기한),개정,서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.,서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.,지급기한 단축\nCHG-008,DOC-002,보험금지급심사 업무매뉴얼,제5조(현장 조사 대상),개정,청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.,청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.,조사 대상 기간 확대\nCHG-009,DOC-002,보험금지급심사 업무매뉴얼,제8조의2(민원 이력 확인),신설,,이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.,민원 이력 연계\nCHG-010,DOC-002,보험금지급심사 업무매뉴얼,제9조(우편 발송 대장),삭제,우편 발송 건은 수기 대장에 기록하여 관리한다.,,수기 대장 폐지\nCHG-011,DOC-003,심사업무운영 내규,제3조(전결 권한),개정,팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.,팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.,전결 한도 상향\nCHG-012,DOC-003,심사업무운영 내규,제4조(교육 이수),개정,심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.,심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.,교육 시간 확대\nCHG-013,DOC-003,심사업무운영 내규,제5조(기준 문서 점검),개정,심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.,심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.,점검 주기 단축\nCHG-014,DOC-003,심사업무운영 내규,제6조의2(AI 도구 활용),신설,,업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.,AI 활용 원칙\nCHG-015,DOC-003,심사업무운영 내규,제8조(수기 대장 관리),삭제,심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.,,수기 대장 폐지\n"}, "mails": [{"name": "알림메일_샘플1.txt", "text": "제목: [Hana Life] 계약인수 사무처리기준 변경 안내\n\n담당자A님,\n구독 중인 '사무처리기준' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n첨부된 변경대비표를 확인해 주세요.\n\n※ 본 메일은 가상 데이터입니다.\n"}, {"name": "알림메일_샘플2.txt", "text": "제목: [Hana Life] 심사업무운영 내규 변경 안내\n\n담당자C님,\n구독 중인 '내규' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n변경 내용은 시스템에서 확인할 수 있습니다.\n\n※ 본 메일은 가상 데이터입니다.\n"}]};
+const SAMPLE = {"files": [{"name": "계약인수_사무처리기준_v1.0.txt", "text": "[Hana Life 심사부] 계약인수 사무처리기준 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 기준은 Hana Life 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제11조(팩스 접수) 팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "계약인수_사무처리기준_v2.0.txt", "text": "[Hana Life 심사부] 계약인수 사무처리기준 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 기준은 Hana Life 심사부의 계약인수 심사 업무 처리에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(적용범위) 이 기준은 개인보험 신계약의 인수심사에 적용한다.\n\n제3조(고지의무 확인) 심사자는 청약서의 계약 전 알릴 의무 사항의 기재 여부를 확인하여야 한다.\n\n제4조(보험가입금액 한도) 무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.\n\n제5조(건강진단 대상) 가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.\n\n제6조(심사 처리기한) 심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.\n\n제7조(위험직업 분류) 피보험자의 직업은 위험등급 1급부터 3급까지로 분류한다.\n\n제8조(할증 인수) 표준체 기준을 초과하는 위험이 있는 경우 심사자는 할증 조건을 부가하여 인수할 수 있다.\n\n제9조(심사 의견서) 인수 거절 또는 조건부 인수 시 심사 의견서를 서면으로 작성하여야 한다.\n\n제9조의2(전자청약 심사) 전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.\n\n제10조(재심사) 인수 거절 건에 대해 고객이 재심사를 요청하는 경우 1회에 한하여 재심사할 수 있다.\n\n제12조(기록 보관) 심사 관련 서류는 계약 소멸 후 5년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v1.0.txt", "text": "[Hana Life 심사부] 보험금지급심사 업무매뉴얼 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 매뉴얼은 Hana Life 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 50만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제9조(우편 발송 대장) 우편 발송 건은 수기 대장에 기록하여 관리한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "보험금지급심사_업무매뉴얼_v2.0.txt", "text": "[Hana Life 심사부] 보험금지급심사 업무매뉴얼 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 매뉴얼은 Hana Life 심사부의 보험금 지급심사 업무 절차를 안내함을 목적으로 한다.\n\n제2조(접수 확인) 청구서류 접수 시 필수 서류의 구비 여부를 확인한다.\n\n제3조(소액 청구 처리) 청구금액 100만원 이하 건은 간이 심사로 처리한다.\n\n제4조(지급 기한) 서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.\n\n제5조(현장 조사 대상) 청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.\n\n제6조(면책 사유 검토) 약관상 면책 사유에 해당하는지 사고 경위서와 진료기록을 기준으로 검토한다.\n\n제7조(지급 거절 통보) 지급 거절 시 사유를 서면으로 고객에게 통보한다.\n\n제8조(이의 신청) 고객은 지급 결정에 이의가 있는 경우 통보일부터 30일 이내에 이의를 신청할 수 있다.\n\n제8조의2(민원 이력 확인) 이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.\n\n제10조(기록 보관) 지급심사 관련 서류는 지급 완료 후 3년간 보관한다.\n"}, {"name": "심사업무운영_내규_v1.0.txt", "text": "[Hana Life 심사부] 심사업무운영 내규 (v1.0, 시행일 2026-01-01)\n\n제1조(목적) 이 내규는 Hana Life 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제8조(수기 대장 관리) 심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "심사업무운영_내규_v2.0.txt", "text": "[Hana Life 심사부] 심사업무운영 내규 (v2.0, 시행일 2026-07-01)\n\n제1조(목적) 이 내규는 Hana Life 심사부의 업무 운영에 필요한 사항을 정함을 목적으로 한다.\n\n제2조(조직) 심사부는 심사1팀과 심사2팀으로 구성한다.\n\n제3조(전결 권한) 팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.\n\n제4조(교육 이수) 심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.\n\n제5조(기준 문서 점검) 심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.\n\n제6조(보안 준수) 심사자는 고객 정보를 업무 목적 외로 사용하거나 외부로 반출하여서는 안 된다.\n\n제6조의2(AI 도구 활용) 업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.\n\n제7조(업무 인수인계) 담당자 변경 시 7일 이내에 인수인계서를 작성하여야 한다.\n\n제9조(감사 대응) 내부 감사 요청 시 심사부는 관련 자료를 5영업일 이내에 제출한다.\n\n제10조(시행일) 이 내규는 승인일부터 시행한다.\n"}, {"name": "회의록_샘플.txt", "text": "[Hana Life 심사부] 주간 회의록 (2026-10-05)\n\n- 안건: 10월 인수심사 현황 공유\n- 참석: 담당자A, 담당자B, 담당자C\n- 결정: 다음 주 교육 일정 확정\n"}], "csv": {"documents": "doc_id,title,doc_type,version,effective_date,owner_name,file_name\nDOC-001-1,계약인수 사무처리기준,사무처리기준,v1.0,2026-01-01,담당자A,계약인수_사무처리기준_v1.0.txt\nDOC-001-2,계약인수 사무처리기준,사무처리기준,v2.0,2026-07-01,담당자A,계약인수_사무처리기준_v2.0.txt\nDOC-002-1,보험금지급심사 업무매뉴얼,업무매뉴얼,v1.0,2026-01-01,담당자B,보험금지급심사_업무매뉴얼_v1.0.txt\nDOC-002-2,보험금지급심사 업무매뉴얼,업무매뉴얼,v2.0,2026-07-01,담당자B,보험금지급심사_업무매뉴얼_v2.0.txt\nDOC-003-1,심사업무운영 내규,내규,v1.0,2026-01-01,담당자C,심사업무운영_내규_v1.0.txt\nDOC-003-2,심사업무운영 내규,내규,v2.0,2026-07-01,담당자C,심사업무운영_내규_v2.0.txt\n", "users": "user_id,name,team,email,subscribed_types\nU01,담당자A,심사1팀,a@example.com,사무처리기준|내규\nU02,담당자B,심사1팀,b@example.com,업무매뉴얼\nU03,담당자C,심사2팀,c@example.com,내규|업무매뉴얼\nU04,담당자D,심사2팀,d@example.com,사무처리기준\nU05,팀장E,심사부,e@example.com,사무처리기준|업무매뉴얼|내규\n", "classification_keywords": "doc_type,keyword\n사무처리기준,사무처리\n사무처리기준,인수기준\n사무처리기준,처리기준\n업무매뉴얼,업무매뉴얼\n업무매뉴얼,지급심사\n업무매뉴얼,매뉴얼\n내규,내규\n내규,운영규정\n내규,전결\n품의문,품의\n품의문,결재요청\n", "expected_changes": "change_id,doc_id,doc_title,section,change_type,before_text,after_text,note\nCHG-001,DOC-001,계약인수 사무처리기준,제4조(보험가입금액 한도),개정,무진단 계약의 1인당 보험가입금액 한도는 1억원으로 한다.,무진단 계약의 1인당 보험가입금액 한도는 1억 5천만원으로 한다.,한도 상향\nCHG-002,DOC-001,계약인수 사무처리기준,제5조(건강진단 대상),개정,가입금액이 3억원을 초과하거나 피보험자가 만 50세 이상인 경우 건강진단을 실시한다.,가입금액이 3억원을 초과하거나 피보험자가 만 45세 이상인 경우 건강진단을 실시한다.,연령 기준 하향\nCHG-003,DOC-001,계약인수 사무처리기준,제6조(심사 처리기한),개정,심사자는 청약서 접수일부터 5영업일 이내에 인수 여부를 결정한다.,심사자는 청약서 접수일부터 3영업일 이내에 인수 여부를 결정한다.,처리기한 단축\nCHG-004,DOC-001,계약인수 사무처리기준,제9조의2(전자청약 심사),신설,,전자청약 건은 본인 확인 완료 여부를 우선 확인하여야 한다.,전자청약 대응\nCHG-005,DOC-001,계약인수 사무처리기준,제11조(팩스 접수),삭제,팩스로 접수된 청약서는 원본 도착 시까지 가심사로 처리한다.,,팩스 접수 폐지\nCHG-006,DOC-002,보험금지급심사 업무매뉴얼,제3조(소액 청구 처리),개정,청구금액 50만원 이하 건은 간이 심사로 처리한다.,청구금액 100만원 이하 건은 간이 심사로 처리한다.,간이심사 기준 상향\nCHG-007,DOC-002,보험금지급심사 업무매뉴얼,제4조(지급 기한),개정,서류 접수일부터 7영업일 이내에 지급 여부를 결정한다.,서류 접수일부터 5영업일 이내에 지급 여부를 결정한다.,지급기한 단축\nCHG-008,DOC-002,보험금지급심사 업무매뉴얼,제5조(현장 조사 대상),개정,청구금액 1천만원 이상이거나 가입 후 1년 이내 발생한 사고는 현장 조사 대상으로 한다.,청구금액 1천만원 이상이거나 가입 후 2년 이내 발생한 사고는 현장 조사 대상으로 한다.,조사 대상 기간 확대\nCHG-009,DOC-002,보험금지급심사 업무매뉴얼,제8조의2(민원 이력 확인),신설,,이의 신청 건은 동일 고객의 과거 민원 이력을 함께 확인한다.,민원 이력 연계\nCHG-010,DOC-002,보험금지급심사 업무매뉴얼,제9조(우편 발송 대장),삭제,우편 발송 건은 수기 대장에 기록하여 관리한다.,,수기 대장 폐지\nCHG-011,DOC-003,심사업무운영 내규,제3조(전결 권한),개정,팀장의 인수심사 전결 한도는 보험가입금액 2억원으로 한다.,팀장의 인수심사 전결 한도는 보험가입금액 3억원으로 한다.,전결 한도 상향\nCHG-012,DOC-003,심사업무운영 내규,제4조(교육 이수),개정,심사자는 연 8시간 이상의 직무 교육을 이수하여야 한다.,심사자는 연 12시간 이상의 직무 교육을 이수하여야 한다.,교육 시간 확대\nCHG-013,DOC-003,심사업무운영 내규,제5조(기준 문서 점검),개정,심사부 기준 문서는 연 1회 이상 점검하고 필요 시 개정한다.,심사부 기준 문서는 반기 1회 이상 점검하고 필요 시 개정한다.,점검 주기 단축\nCHG-014,DOC-003,심사업무운영 내규,제6조의2(AI 도구 활용),신설,,업무 보조 목적으로 AI 도구를 활용하는 경우 개인정보 및 고객정보를 입력하여서는 안 된다.,AI 활용 원칙\nCHG-015,DOC-003,심사업무운영 내규,제8조(수기 대장 관리),삭제,심사 접수 내역은 수기 대장을 별도로 작성하여 관리한다.,,수기 대장 폐지\n", "change_history": "history_id,month,doc_title,doc_type,revised,added,deleted,total_articles\nHIS-001,2025-01,계약인수 사무처리기준,사무처리기준,2,1,0,12\nHIS-002,2025-01,보험금지급심사 업무매뉴얼,업무매뉴얼,1,1,0,10\nHIS-003,2025-02,계약인수 사무처리기준,사무처리기준,1,1,1,12\nHIS-004,2025-02,보험금지급심사 업무매뉴얼,업무매뉴얼,1,2,1,10\nHIS-005,2025-02,심사업무운영 내규,내규,1,0,0,10\nHIS-006,2025-04,계약인수 사무처리기준,사무처리기준,2,1,1,12\nHIS-007,2025-04,보험금지급심사 업무매뉴얼,업무매뉴얼,1,2,0,10\nHIS-008,2025-05,보험금지급심사 업무매뉴얼,업무매뉴얼,2,1,0,10\nHIS-009,2025-06,계약인수 사무처리기준,사무처리기준,1,2,0,12\nHIS-010,2025-08,계약인수 사무처리기준,사무처리기준,2,0,0,12\nHIS-011,2025-08,보험금지급심사 업무매뉴얼,업무매뉴얼,3,2,1,10\nHIS-012,2025-09,보험금지급심사 업무매뉴얼,업무매뉴얼,1,0,1,10\nHIS-013,2025-09,심사업무운영 내규,내규,3,0,1,10\nHIS-014,2025-10,계약인수 사무처리기준,사무처리기준,1,2,0,12\nHIS-015,2025-10,보험금지급심사 업무매뉴얼,업무매뉴얼,3,2,1,10\nHIS-016,2025-12,심사업무운영 내규,내규,3,2,1,10\nHIS-017,2026-01,계약인수 사무처리기준,사무처리기준,4,1,0,12\nHIS-018,2026-03,계약인수 사무처리기준,사무처리기준,2,1,1,12\nHIS-019,2026-04,계약인수 사무처리기준,사무처리기준,4,2,0,12\nHIS-020,2026-05,보험금지급심사 업무매뉴얼,업무매뉴얼,4,1,1,10\nHIS-021,2026-06,계약인수 사무처리기준,사무처리기준,2,0,0,12\nHIS-022,2026-06,심사업무운영 내규,내규,2,1,0,10\n"}, "mails": [{"name": "알림메일_샘플1.txt", "text": "제목: [Hana Life] 계약인수 사무처리기준 변경 안내\n\n담당자A님,\n구독 중인 '사무처리기준' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n첨부된 변경대비표를 확인해 주세요.\n\n※ 본 메일은 가상 데이터입니다.\n"}, {"name": "알림메일_샘플2.txt", "text": "제목: [Hana Life] 심사업무운영 내규 변경 안내\n\n담당자C님,\n구독 중인 '내규' 문서(v2.0)에 변경이 감지되었습니다.\n- 개정 3건, 신설 1건, 삭제 1건\n변경 내용은 시스템에서 확인할 수 있습니다.\n\n※ 본 메일은 가상 데이터입니다.\n"}], "xlsxTemplate": {"styles": "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><numFmts count=\"0\"/><fonts count=\"3\"><font><name val=\"Calibri\"/><family val=\"2\"/><color theme=\"1\"/><sz val=\"11\"/><scheme val=\"minor\"/><\/font><font><b val=\"1\"/><sz val=\"14\"/><\/font><font><b val=\"1\"/><color rgb=\"00FFFFFF\"/><\/font><\/fonts><fills count=\"3\"><fill><patternFill/><\/fill><fill><patternFill patternType=\"gray125\"/><\/fill><fill><patternFill patternType=\"solid\"/><\/fill><\/fills><borders count=\"2\"><border><left/><right/><top/><bottom/><diagonal/><\/border><border><left style=\"thin\"/><right style=\"thin\"/><top style=\"thin\"/><bottom style=\"thin\"/><\/border><\/borders><cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/><\/cellStyleXfs><cellXfs count=\"4\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"/><xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\"/><\/xf><xf numFmtId=\"0\" fontId=\"2\" fillId=\"2\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment horizontal=\"center\"/><\/xf><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"1\" applyAlignment=\"1\" pivotButton=\"0\" quotePrefix=\"0\" xfId=\"0\"><alignment vertical=\"top\" wrapText=\"1\"/><\/xf><\/cellXfs><cellStyles count=\"1\"><cellStyle name=\"Normal\" xfId=\"0\" builtinId=\"0\" hidden=\"0\"/><\/cellStyles><tableStyles count=\"0\" defaultTableStyle=\"TableStyleMedium9\" defaultPivotStyle=\"PivotStyleLight16\"/><colors><indexedColors><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00000000\"/><rgbColor rgb=\"00FFFFFF\"/><rgbColor rgb=\"00FF0000\"/><rgbColor rgb=\"0000FF00\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008000\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00808000\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"00C0C0C0\"/><rgbColor rgb=\"00808080\"/><rgbColor rgb=\"009999FF\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00FFFFCC\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00660066\"/><rgbColor rgb=\"00FF8080\"/><rgbColor rgb=\"000066CC\"/><rgbColor rgb=\"00CCCCFF\"/><rgbColor rgb=\"00000080\"/><rgbColor rgb=\"00FF00FF\"/><rgbColor rgb=\"00FFFF00\"/><rgbColor rgb=\"0000FFFF\"/><rgbColor rgb=\"00800080\"/><rgbColor rgb=\"00800000\"/><rgbColor rgb=\"00008080\"/><rgbColor rgb=\"000000FF\"/><rgbColor rgb=\"0000CCFF\"/><rgbColor rgb=\"00CCFFFF\"/><rgbColor rgb=\"00CCFFCC\"/><rgbColor rgb=\"00FFFF99\"/><rgbColor rgb=\"0099CCFF\"/><rgbColor rgb=\"00FF99CC\"/><rgbColor rgb=\"00CC99FF\"/><rgbColor rgb=\"00FFCC99\"/><rgbColor rgb=\"003366FF\"/><rgbColor rgb=\"0033CCCC\"/><rgbColor rgb=\"0099CC00\"/><rgbColor rgb=\"00FFCC00\"/><rgbColor rgb=\"00FF9900\"/><rgbColor rgb=\"00FF6600\"/><rgbColor rgb=\"00666699\"/><rgbColor rgb=\"00969696\"/><rgbColor rgb=\"00003366\"/><rgbColor rgb=\"00339966\"/><rgbColor rgb=\"00003300\"/><rgbColor rgb=\"00333300\"/><rgbColor rgb=\"00993300\"/><rgbColor rgb=\"00993366\"/><rgbColor rgb=\"00333399\"/><rgbColor rgb=\"00333333\"/><\/indexedColors><\/colors><\/styleSheet>", "theme": "<?xml version=\"1.0\"?>\n<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" name=\"Office Theme\">\n  <a:themeElements>\n    <a:clrScheme name=\"Office\">\n      <a:dk1>\n        <a:sysClr val=\"windowText\" lastClr=\"000000\"/>\n      <\/a:dk1>\n      <a:lt1>\n        <a:sysClr val=\"window\" lastClr=\"FFFFFF\"/>\n      <\/a:lt1>\n      <a:dk2>\n        <a:srgbClr val=\"1F497D\"/>\n      <\/a:dk2>\n      <a:lt2>\n        <a:srgbClr val=\"EEECE1\"/>\n      <\/a:lt2>\n      <a:accent1>\n        <a:srgbClr val=\"4F81BD\"/>\n      <\/a:accent1>\n      <a:accent2>\n        <a:srgbClr val=\"C0504D\"/>\n      <\/a:accent2>\n      <a:accent3>\n        <a:srgbClr val=\"9BBB59\"/>\n      <\/a:accent3>\n      <a:accent4>\n        <a:srgbClr val=\"8064A2\"/>\n      <\/a:accent4>\n      <a:accent5>\n        <a:srgbClr val=\"4BACC6\"/>\n      <\/a:accent5>\n      <a:accent6>\n        <a:srgbClr val=\"F79646\"/>\n      <\/a:accent6>\n      <a:hlink>\n        <a:srgbClr val=\"0000FF\"/>\n      <\/a:hlink>\n      <a:folHlink>\n        <a:srgbClr val=\"800080\"/>\n      <\/a:folHlink>\n    <\/a:clrScheme>\n    <a:fontScheme name=\"Office\">\n      <a:majorFont>\n        <a:latin typeface=\"Cambria\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Hebr\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"MoolBoran\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Times New Roman\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      <\/a:majorFont>\n      <a:minorFont>\n        <a:latin typeface=\"Calibri\"/>\n        <a:ea typeface=\"\"/>\n        <a:cs typeface=\"\"/>\n        <a:font script=\"Jpan\" typeface=\"&#xFF2D;&#xFF33; &#xFF30;&#x30B4;&#x30B7;&#x30C3;&#x30AF;\"/>\n        <a:font script=\"Hang\" typeface=\"&#xB9D1;&#xC740; &#xACE0;&#xB515;\"/>\n        <a:font script=\"Hans\" typeface=\"&#x5B8B;&#x4F53;\"/>\n        <a:font script=\"Hant\" typeface=\"&#x65B0;&#x7D30;&#x660E;&#x9AD4;\"/>\n        <a:font script=\"Arab\" typeface=\"Arial\"/>\n        <a:font script=\"Hebr\" typeface=\"Arial\"/>\n        <a:font script=\"Thai\" typeface=\"Tahoma\"/>\n        <a:font script=\"Ethi\" typeface=\"Nyala\"/>\n        <a:font script=\"Beng\" typeface=\"Vrinda\"/>\n        <a:font script=\"Gujr\" typeface=\"Shruti\"/>\n        <a:font script=\"Khmr\" typeface=\"DaunPenh\"/>\n        <a:font script=\"Knda\" typeface=\"Tunga\"/>\n        <a:font script=\"Guru\" typeface=\"Raavi\"/>\n        <a:font script=\"Cans\" typeface=\"Euphemia\"/>\n        <a:font script=\"Cher\" typeface=\"Plantagenet Cherokee\"/>\n        <a:font script=\"Yiii\" typeface=\"Microsoft Yi Baiti\"/>\n        <a:font script=\"Tibt\" typeface=\"Microsoft Himalaya\"/>\n        <a:font script=\"Thaa\" typeface=\"MV Boli\"/>\n        <a:font script=\"Deva\" typeface=\"Mangal\"/>\n        <a:font script=\"Telu\" typeface=\"Gautami\"/>\n        <a:font script=\"Taml\" typeface=\"Latha\"/>\n        <a:font script=\"Syrc\" typeface=\"Estrangelo Edessa\"/>\n        <a:font script=\"Orya\" typeface=\"Kalinga\"/>\n        <a:font script=\"Mlym\" typeface=\"Kartika\"/>\n        <a:font script=\"Laoo\" typeface=\"DokChampa\"/>\n        <a:font script=\"Sinh\" typeface=\"Iskoola Pota\"/>\n        <a:font script=\"Mong\" typeface=\"Mongolian Baiti\"/>\n        <a:font script=\"Viet\" typeface=\"Arial\"/>\n        <a:font script=\"Uigh\" typeface=\"Microsoft Uighur\"/>\n      <\/a:minorFont>\n    <\/a:fontScheme>\n    <a:fmtScheme name=\"Office\">\n      <a:fillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        <\/a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"50000\"/>\n                <a:satMod val=\"300000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"35000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"37000\"/>\n                <a:satMod val=\"300000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"15000\"/>\n                <a:satMod val=\"350000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n          <\/a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"1\"/>\n        <\/a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"51000\"/>\n                <a:satMod val=\"130000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"80000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"93000\"/>\n                <a:satMod val=\"130000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"94000\"/>\n                <a:satMod val=\"135000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n          <\/a:gsLst>\n          <a:lin ang=\"16200000\" scaled=\"0\"/>\n        <\/a:gradFill>\n      <\/a:fillStyleLst>\n      <a:lnStyleLst>\n        <a:ln w=\"9525\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\">\n              <a:shade val=\"95000\"/>\n              <a:satMod val=\"105000\"/>\n            <\/a:schemeClr>\n          <\/a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        <\/a:ln>\n        <a:ln w=\"25400\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          <\/a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        <\/a:ln>\n        <a:ln w=\"38100\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">\n          <a:solidFill>\n            <a:schemeClr val=\"phClr\"/>\n          <\/a:solidFill>\n          <a:prstDash val=\"solid\"/>\n        <\/a:ln>\n      <\/a:lnStyleLst>\n      <a:effectStyleLst>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"20000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"38000\"/>\n              <\/a:srgbClr>\n            <\/a:outerShdw>\n          <\/a:effectLst>\n        <\/a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              <\/a:srgbClr>\n            <\/a:outerShdw>\n          <\/a:effectLst>\n        <\/a:effectStyle>\n        <a:effectStyle>\n          <a:effectLst>\n            <a:outerShdw blurRad=\"40000\" dist=\"23000\" dir=\"5400000\" rotWithShape=\"0\">\n              <a:srgbClr val=\"000000\">\n                <a:alpha val=\"35000\"/>\n              <\/a:srgbClr>\n            <\/a:outerShdw>\n          <\/a:effectLst>\n          <a:scene3d>\n            <a:camera prst=\"orthographicFront\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"0\"/>\n            <\/a:camera>\n            <a:lightRig rig=\"threePt\" dir=\"t\">\n              <a:rot lat=\"0\" lon=\"0\" rev=\"1200000\"/>\n            <\/a:lightRig>\n          <\/a:scene3d>\n          <a:sp3d>\n            <a:bevelT w=\"63500\" h=\"25400\"/>\n          <\/a:sp3d>\n        <\/a:effectStyle>\n      <\/a:effectStyleLst>\n      <a:bgFillStyleLst>\n        <a:solidFill>\n          <a:schemeClr val=\"phClr\"/>\n        <\/a:solidFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"40000\"/>\n                <a:satMod val=\"350000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"40000\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"45000\"/>\n                <a:shade val=\"99000\"/>\n                <a:satMod val=\"350000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"20000\"/>\n                <a:satMod val=\"255000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n          <\/a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"-80000\" r=\"50000\" b=\"180000\"/>\n          <\/a:path>\n        <\/a:gradFill>\n        <a:gradFill rotWithShape=\"1\">\n          <a:gsLst>\n            <a:gs pos=\"0\">\n              <a:schemeClr val=\"phClr\">\n                <a:tint val=\"80000\"/>\n                <a:satMod val=\"300000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n            <a:gs pos=\"100000\">\n              <a:schemeClr val=\"phClr\">\n                <a:shade val=\"30000\"/>\n                <a:satMod val=\"200000\"/>\n              <\/a:schemeClr>\n            <\/a:gs>\n          <\/a:gsLst>\n          <a:path path=\"circle\">\n            <a:fillToRect l=\"50000\" t=\"50000\" r=\"50000\" b=\"50000\"/>\n          <\/a:path>\n        <\/a:gradFill>\n      <\/a:bgFillStyleLst>\n    <\/a:fmtScheme>\n  <\/a:themeElements>\n  <a:objectDefaults/>\n  <a:extraClrSchemeLst/>\n<\/a:theme>\n", "sheet": "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><sheetPr><outlinePr summaryBelow=\"1\" summaryRight=\"1\"/><pageSetUpPr/><\/sheetPr><dimension ref=\"A1:E5\"/><sheetViews><sheetView workbookViewId=\"0\"><selection activeCell=\"A1\" sqref=\"A1\"/><\/sheetView><\/sheetViews><sheetFormatPr baseColWidth=\"8\" defaultRowHeight=\"15\"/><cols><col width=\"24\" customWidth=\"1\" min=\"1\" max=\"1\"/><col width=\"45\" customWidth=\"1\" min=\"2\" max=\"2\"/><col width=\"45\" customWidth=\"1\" min=\"3\" max=\"3\"/><col width=\"12\" customWidth=\"1\" min=\"4\" max=\"4\"/><col width=\"22\" customWidth=\"1\" min=\"5\" max=\"5\"/><\/cols><sheetData><row r=\"1\"><c r=\"A1\" s=\"1\" t=\"inlineStr\"><is><t>&#48320;&#44221;&#45824;&#48708;&#54364;<\/t><\/is><\/c><\/row><row r=\"3\"><c r=\"A3\" s=\"2\" t=\"inlineStr\"><is><t>&#51312;&#54637;<\/t><\/is><\/c><c r=\"B3\" s=\"2\" t=\"inlineStr\"><is><t>&#54788;&#54665;<\/t><\/is><\/c><c r=\"C3\" s=\"2\" t=\"inlineStr\"><is><t>&#44060;&#51221;<\/t><\/is><\/c><c r=\"D3\" s=\"2\" t=\"inlineStr\"><is><t>&#48320;&#44221;&#50976;&#54805;<\/t><\/is><\/c><c r=\"E3\" s=\"2\" t=\"inlineStr\"><is><t>&#48708;&#44256;<\/t><\/is><\/c><\/row><row r=\"4\"><c r=\"A4\" s=\"3\" t=\"inlineStr\"><is><t>&#51228;4&#51312;(&#48372;&#54744;&#44032;&#51077;&#44552;&#50529; &#54620;&#46020;)<\/t><\/is><\/c><c r=\"B4\" s=\"3\" t=\"inlineStr\"><is><t>&#47924;&#51652;&#45800; &#44228;&#50557;&#51032; 1&#51064;&#45817; &#48372;&#54744;&#44032;&#51077;&#44552;&#50529; &#54620;&#46020;&#45716; 1&#50613;&#50896;&#51004;&#47196; &#54620;&#45796;.<\/t><\/is><\/c><c r=\"C4\" s=\"3\" t=\"inlineStr\"><is><t>&#47924;&#51652;&#45800; &#44228;&#50557;&#51032; 1&#51064;&#45817; &#48372;&#54744;&#44032;&#51077;&#44552;&#50529; &#54620;&#46020;&#45716; 1&#50613; 5&#52380;&#47564;&#50896;&#51004;&#47196; &#54620;&#45796;.<\/t><\/is><\/c><c r=\"D4\" s=\"3\" t=\"inlineStr\"><is><t>&#44060;&#51221;<\/t><\/is><\/c><c r=\"E4\" s=\"3\" t=\"inlineStr\"><is><t>&#54620;&#46020; &#49345;&#54693;<\/t><\/is><\/c><\/row><row r=\"5\"><c r=\"A5\" s=\"3\" t=\"inlineStr\"><is><t>&#51228;5&#51312;(&#44148;&#44053;&#51652;&#45800; &#45824;&#49345;)<\/t><\/is><\/c><c r=\"B5\" s=\"3\" t=\"inlineStr\"><is><t>&#44032;&#51077;&#44552;&#50529;&#51060; 3&#50613;&#50896;&#51012; &#52488;&#44284;&#54616;&#44144;&#45208; &#54588;&#48372;&#54744;&#51088;&#44032; &#47564; 50&#49464; &#51060;&#49345;&#51064; &#44221;&#50864; &#44148;&#44053;&#51652;&#45800;&#51012; &#49892;&#49884;&#54620;&#45796;.<\/t><\/is><\/c><c r=\"C5\" s=\"3\" t=\"inlineStr\"><is><t>&#44032;&#51077;&#44552;&#50529;&#51060; 3&#50613;&#50896;&#51012; &#52488;&#44284;&#54616;&#44144;&#45208; &#54588;&#48372;&#54744;&#51088;&#44032; &#47564; 45&#49464; &#51060;&#49345;&#51064; &#44221;&#50864; &#44148;&#44053;&#51652;&#45800;&#51012; &#49892;&#49884;&#54620;&#45796;.<\/t><\/is><\/c><c r=\"D5\" s=\"3\" t=\"inlineStr\"><is><t>&#44060;&#51221;<\/t><\/is><\/c><c r=\"E5\" s=\"3\" t=\"inlineStr\"><is><t>&#50672;&#47161; &#44592;&#51456; &#54616;&#54693;<\/t><\/is><\/c><\/row><\/sheetData><mergeCells count=\"1\"><mergeCell ref=\"A1:E1\"/><\/mergeCells><pageMargins left=\"0.75\" right=\"0.75\" top=\"1\" bottom=\"1\" header=\"0.5\" footer=\"0.5\"/><\/worksheet>"}};
 const TYPES = ["개정", "신설", "삭제"];
 const STORE_KEY = "ganada-manual-update-v1";
 
@@ -411,19 +412,20 @@ const state = {
   library: [],      // {name, text, uploaded}
   runs: [],         // 비교 결과
   notices: [],      // 알림
-  currentRun: null, currentMsg: null, userFilter: "all", tab: "library",
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true,
 };
 function loadRef() {
   state.docsMeta = parseCSV(SAMPLE.csv.documents);
   state.users = parseCSV(SAMPLE.csv.users);
   state.keywords = parseCSV(SAMPLE.csv.classification_keywords);
   state.expected = parseCSV(SAMPLE.csv.expected_changes);
+  state.history = parseCSV(SAMPLE.csv.change_history || "");
 }
 function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       library: state.library.filter(f => f.uploaded), runs: state.runs, notices: state.notices,
-      users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta,
+      users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta, history: state.history,
     }));
   } catch (e) { /* 저장 불가 환경: 무시 */ }
 }
@@ -432,7 +434,7 @@ function restore() {
     const d = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
     if (!d) return false;
     Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
-    ["users", "keywords", "expected", "docsMeta"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
+    ["users", "keywords", "expected", "docsMeta", "history"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
     const up = d.library || [], upNames = new Set(up.map(f => f.name));
     state.library = SAMPLE.files.filter(f => !upNames.has(f.name)).map(f => ({ ...f, uploaded: false })).concat(up);
     return state.runs.length > 0;
@@ -460,7 +462,7 @@ function parseDoc(file) {
   const version = (head.match(/\((v[\d.]+)/) || file.name.match(/_(v[\d.]+)/) || [])[1] || meta?.version || "";
   const eff = (head.match(/시행일\s*(\d{4}-\d{2}-\d{2})/) || [])[1] || meta?.effective_date || "";
   const title = meta?.title || (head.match(/\]\s*(.+?)\s*\(v/) || [])[1]
-    || file.name.replace(/\.(txt|docx)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
+    || file.name.replace(/\.(txt|docx|pdf)$/i, "").replace(/_v[\d.]+$/, "").replace(/_/g, " ");
   return { name: file.name, title: norm(title), version, eff, meta, articles, preamble: head, cls: classify(file.name, file.text) };
 }
 
@@ -489,7 +491,12 @@ function groupLibrary() {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(d);
   }
-  return [...groups.values()].map(list => list.sort((a, b) => versionNum(a.version) - versionNum(b.version)));
+  // 같은 문서·같은 버전 파일이 여러 개면(예: txt와 pdf) 가장 나중에 올린 파일만 쓴다
+  return [...groups.values()].map(list => {
+    const byVer = new Map();
+    list.forEach(d => { const k = d.version || d.name; if (byVer.has(k)) d.replaces = byVer.get(k).name; byVer.set(k, d); });
+    return [...byVer.values()].sort((a, b) => versionNum(a.version) - versionNum(b.version));
+  });
 }
 
 /* ---------- 비교 ---------- */
@@ -543,8 +550,9 @@ function compareDocs(oldDoc, newDoc) {
 }
 
 function baseDocId(list) {   // 같은 문서의 어느 버전이든 문서 메타에 있으면 그 문서 ID를 쓴다
-  const known = [...list].reverse().find(d => d.meta?.doc_id);
-  return known ? known.meta.doc_id.replace(/-\d+$/, "") : "UPL-" + tight(list[list.length - 1].title).slice(0, 12);
+  const known = [...list].reverse().find(d => d.meta?.doc_id)?.meta
+    || state.docsMeta.find(m => tight(m.title) === tight(list[list.length - 1].title));   // 파일 이름이 달라도 제목이 같으면 같은 문서
+  return known ? known.doc_id.replace(/-\d+$/, "") : "UPL-" + tight(list[list.length - 1].title).slice(0, 12);
 }
 
 function groupPII(list) { return list.slice(-2).map(d => ({ source: d.name, findings: scanPII(d.preamble + "\n" + d.articles.map(a => a.title + " " + a.body).join("\n")) })); }
@@ -640,7 +648,7 @@ function renderLibrary() {
           <span class="stamp ${typeCls}">${esc(last.cls.type)}</span>
           ${run ? `<span class="muted">변경 ${run.changes.length}건 감지</span>` : ""}
         </div>
-        <div class="files">${list.map(d => `<span class="file">${esc(d.name)}${d.version ? " · " + esc(d.version) : ""}${d.articles.length ? ` · ${d.articles.length}개 조항` : ""}</span>`).join("")}</div>
+        <div class="files">${list.map(d => `<span class="file">${esc(d.name)}${d.version ? " · " + esc(d.version) : ""}${d.articles.length ? ` · ${d.articles.length}개 조항` : ""}${d.replaces ? ` · 같은 버전 ${esc(d.replaces)} 대신 사용` : ""}</span>`).join("")}</div>
         <p class="kw">${last.cls.hits.length ? "분류 근거 키워드: " + last.cls.hits.map(esc).join(", ") : "일치하는 분류 키워드가 없어 미분류로 둡니다."}${!pair && last.articles.length ? " · 비교할 다른 버전이 없습니다." : ""}${!last.articles.length ? " · 조항(제N조) 구조가 없어 비교 대상에서 제외합니다." : ""}</p>
       </div>
       <div>${pair ? `<button class="btn ${run ? "" : "primary"}" data-run="${gi}">${run ? "대비표 보기" : `${esc(list[list.length - 2].version)} → ${esc(last.version)} 비교`}</button>` : ""}</div>
@@ -740,7 +748,7 @@ function renderVerify() {
 function renderInbox() {
   const unread = state.notices.filter(n => !n.read).length;
   $("#unread").textContent = unread; $("#unread").hidden = !unread;
-  if ($("#lcdRight")) $("#lcdRight").textContent = `ALERT ${unread}`;
+  if ($("#lcdRight")) $("#lcdRight").textContent = `알림 ${unread}`;
   const sel = $("#userFilter");
   sel.innerHTML = `<option value="all">전체</option>` + state.users.map(u => `<option value="${esc(u.user_id)}">${esc(u.name)} (${esc(u.team)})</option>`).join("");
   sel.value = state.userFilter;
@@ -762,12 +770,22 @@ function renderInbox() {
 }
 
 function renderStats() {
-  const recs = state.runs.flatMap(r => r.changes.map(x => ({ ...x, month: r.eff.slice(0, 7), year: r.eff.slice(0, 4) })));
+  // 이번 비교 결과 + 과거 개정 이력(가상, change_history.csv)을 합쳐 집계한다
+  const runMonths = new Set(state.runs.map(r => r.eff.slice(0, 7)));
+  const recs = state.runs.flatMap(r => r.changes.map(x => ({ type: x.type, n: 1, month: r.eff.slice(0, 7) })));
+  if (state.showHistory) (state.history || []).filter(h => !runMonths.has(h.month)).forEach(h =>
+    [["개정", h.revised], ["신설", h.added], ["삭제", h.deleted]].forEach(([type, n]) => { if (+n) recs.push({ type, n: +n, month: h.month }); }));
+  recs.forEach(x => x.year = x.month.slice(0, 4));
   const agg = key => {
     const m = new Map();
-    recs.forEach(x => { const k = x[key]; if (!m.has(k)) m.set(k, { 개정: 0, 신설: 0, 삭제: 0 }); m.get(k)[x.type]++; });
+    recs.forEach(x => { const k = x[key]; if (!m.has(k)) m.set(k, { 개정: 0, 신설: 0, 삭제: 0 }); m.get(k)[x.type] += x.n; });
+    if (key === "month" && m.size) {   // 변경이 없던 달도 0건으로 보여 흐름이 끊기지 않게 한다
+      const ks = [...m.keys()].sort(); let [y, mo] = ks[0].split("-").map(Number); const [ey, em] = ks[ks.length - 1].split("-").map(Number);
+      while (y < ey || (y === ey && mo <= em)) { const k = `${y}-${String(mo).padStart(2, "0")}`; if (!m.has(k)) m.set(k, { 개정: 0, 신설: 0, 삭제: 0 }); if (++mo > 12) { mo = 1; y++; } }
+    }
     return [...m.entries()].sort();
   };
+  const histN = (state.history || []).length;
   const bars = rows => {
     const max = Math.max(1, ...rows.map(([, c]) => c.개정 + c.신설 + c.삭제));
     return `<div class="bars">${rows.map(([k, c]) => { const t = c.개정 + c.신설 + c.삭제; return `<div class="barrow"><span class="mono">${esc(k)}</span>
@@ -777,8 +795,10 @@ function renderStats() {
   const legend = `<div class="legend">${TYPES.map(t => `<span><i class="seg-${t}"></i>${t}</span>`).join("")}</div>`;
   const docs = Math.max(state.runs.length, 1);
   $("#statsBody").innerHTML = `
+    <div class="bar"><div><h2>집계</h2><span class="muted">이번 비교 ${state.runs.length}건${histN ? ` · 과거 이력 ${histN}건` : ""}</span></div>
+      <div>${histN ? `<label class="check" for="histToggle"><input type="checkbox" id="histToggle" ${state.showHistory ? "checked" : ""}>과거 개정 이력 포함</label>` : ""}</div></div>
     <div class="two">
-      <div class="box"><div class="bar"><h2>월별 변경 건수</h2>${legend}</div>${bars(agg("month"))}<p class="muted">기준: 신버전 시행월</p></div>
+      <div class="box"><div class="bar"><h2>월별 변경 건수</h2>${legend}</div>${bars(agg("month"))}<p class="muted">기준: 신버전 시행월${state.showHistory && histN ? " · 이번 비교 결과 이전 달은 과거 개정 이력(가상 데이터)입니다" : ""}</p></div>
       <div class="box"><div class="bar"><h2>연도별 변경 건수</h2>${legend}</div>${bars(agg("year"))}</div>
     </div>
     <div class="box">
@@ -805,6 +825,7 @@ function renderStats() {
     $("#cOut").textContent = `월 ${(min / 60).toFixed(1)}시간 · 연 ${(min * 12 / 60).toFixed(0)}시간`;
   };
   ["#cDocs", "#cMin", "#cRate"].forEach(s => $(s).oninput = calc); calc();
+  if ($("#histToggle")) $("#histToggle").onchange = e => { state.showHistory = e.target.checked; renderStats(); };
 }
 
 function renderRef() {
@@ -826,8 +847,8 @@ function renderRef() {
 
 function renderLcd() {
   const n = state.runs.reduce((a, r) => a + r.changes.length, 0), unread = state.notices.filter(x => !x.read).length;
-  $("#lcdLeft").textContent = `DOCS ${state.runs.length} · CHANGES ${n}`;
-  $("#lcdRight").textContent = `ALERT ${unread}`;
+  $("#lcdLeft").textContent = `문서 ${state.runs.length} · 변경 ${n}`;
+  $("#lcdRight").textContent = `알림 ${unread}`;
 }
 function renderAll() { renderLcd(); renderLibrary(); renderChanges(); renderVerify(); renderInbox(); renderStats(); renderRef(); }
 
@@ -855,20 +876,52 @@ $("#copyBtn").onclick = () => {
   const cell = v => /[\t\n"]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
   copyText([d.head, ...d.rows].map(r => r.map(cell).join("\t")).join("\n"));
 };
+/* 엑셀: 받은 양식(changes_template.xlsx)의 서식(styles·theme·열 너비)을 그대로 쓰고 내용만 채운다.
+   양식의 셀 서식 번호 — 1: 제목(굵게 14pt, 가운데, A1:E1 병합) / 2: 머리글(굵은 흰 글씨, 칠, 테두리) / 3: 본문(테두리, 위 정렬, 줄바꿈) */
+function buildXlsx(sheets) {
+  const T = SAMPLE.xlsxTemplate;
+  const colOf = i => String.fromCharCode(65 + i);
+  const cell = (ref, v, st) => `<c r="${ref}"${st ? ` s="${st}"` : ""} t="inlineStr"><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+  const tplCols = (T.sheet.match(/<cols>[\s\S]*?<\/cols>/) || [""])[0];
+  const used = new Set();
+  const safeName = n => { let b = n.replace(/[\\/?*[\]:]/g, "").slice(0, 31) || "Sheet", k = b, i = 2; while (used.has(k)) k = b.slice(0, 28) + "_" + i++; used.add(k); return k; };
+  const files = sheets.map((sh, idx) => {
+    const last = colOf(sh.head.length - 1);
+    const cols = sh.head.length === 5 ? tplCols
+      : `<cols><col width="22" customWidth="1" min="1" max="1"/>${tplCols.replace(/<\/?cols>/g, "").replace(/min="(\d)" max="(\d)"/g, (m, a, b) => `min="${+a + 1}" max="${+b + 1}"`)}</cols>`;
+    const rows = [
+      `<row r="1">${cell("A1", sh.title, 1)}</row>`,
+      sh.meta ? `<row r="2">${cell("A2", sh.meta)}</row>` : "",
+      `<row r="3">${sh.head.map((h, i) => cell(colOf(i) + 3, h, 2)).join("")}</row>`,
+      ...sh.rows.map((r, j) => `<row r="${j + 4}">${r.map((v, i) => cell(colOf(i) + (j + 4), v, 3)).join("")}</row>`),
+    ].join("");
+    const xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:${last}${Math.max(3, sh.rows.length + 3)}"/><sheetViews><sheetView workbookViewId="0"${idx === 0 ? ' tabSelected="1"' : ""}/></sheetViews><sheetFormatPr baseColWidth="8" defaultRowHeight="15"/>${cols}<sheetData>${rows}</sheetData><mergeCells count="1"><mergeCell ref="A1:${last}1"/></mergeCells><pageMargins left="0.75" right="0.75" top="1" bottom="1" header="0.5" footer="0.5"/></worksheet>`;
+    return { name: safeName(sh.name), xml };
+  });
+  const R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+  return zipStore([
+    { name: "[Content_Types].xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>${files.map((f, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}</Types>` },
+    { name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="xl/workbook.xml"/></Relationships>` },
+    { name: "xl/workbook.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="${R}"><bookViews><workbookView activeTab="0"/></bookViews><sheets>${files.map((f, i) => `<sheet name="${xe(f.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join("")}</sheets></workbook>` },
+    { name: "xl/_rels/workbook.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${files.map((f, i) => `<Relationship Id="rId${i + 1}" Type="${R}/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join("")}<Relationship Id="rId${files.length + 1}" Type="${R}/styles" Target="styles.xml"/><Relationship Id="rId${files.length + 2}" Type="${R}/theme" Target="theme/theme1.xml"/></Relationships>` },
+    { name: "xl/styles.xml", data: T.styles },
+    { name: "xl/theme/theme1.xml", data: T.theme },
+    ...files.map((f, i) => ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: f.xml })),
+  ], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
 $("#xlsxBtn").onclick = () => {
-  if (!window.XLSX) return toast("엑셀 모듈을 불러오지 못했습니다. ‘표 복사’를 사용하세요.");
   if (!state.runs.length) return toast("먼저 문서를 비교하세요");
-  const wb = XLSX.utils.book_new();
-  const add = (name, head, rows) => {
-    const ws = XLSX.utils.aoa_to_sheet([head, ...rows]);
-    ws["!cols"] = head.map(h => ({ wch: h === "현행" || h === "개정" ? 50 : h === "조항" ? 24 : h === "비고" ? 30 : 12 }));
-    XLSX.utils.book_append_sheet(wb, ws, name.replace(/[\\/?*[\]:]/g, "").slice(0, 31));
-  };
-  state.runs.forEach(r => add(r.title, HEAD, r.changes.map(x => [x.section, x.before, x.after, x.type, x.note])));
-  if (state.runs.length > 1) add("통합정리본", ["문서", ...HEAD], state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])));
+  const sheets = state.runs.map(r => {
+    const c = counts(r.changes);
+    return { name: r.title, title: `${r.title} 변경대비표`, head: HEAD,
+      meta: `${r.oldVer} → ${r.newVer} · 시행일 ${r.eff} · 문서유형 ${r.docType} · 변경 ${r.changes.length}건 (개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}) · 작성일 ${today()}`,
+      rows: r.changes.map(x => [x.section, x.before, x.after, x.type, x.note]) };
+  });
+  if (state.runs.length > 1) sheets.push({ name: "통합정리본", title: "변경대비표 통합 정리본", head: ["문서", ...HEAD],
+    meta: `문서 ${state.runs.length}종 · 변경 ${state.runs.reduce((a, r) => a + r.changes.length, 0)}건 · 작성일 ${today()}`,
+    rows: state.runs.flatMap(r => r.changes.map(x => [r.title, x.section, x.before, x.after, x.type, x.note])) });
   let blob;
-  try { blob = new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })]); }
-  catch (e) { return toast("엑셀 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
+  try { blob = buildXlsx(sheets); } catch (e) { return toast("엑셀 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
   saveBlob(blob, `변경대비표_${today()}.xlsx`, "엑셀");
 };
 
@@ -976,7 +1029,38 @@ $("#docxBtn").onclick = () => {
 };
 
 /* ---------- 입력 ---------- */
+/* PDF: 필요할 때만 pdf.js를 불러온다. 작업 스레드(worker) 없이 같은 화면에서 읽는다 */
+const PDFJS = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/";
+let pdfjsReady;
+const loadScript = src => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = () => no(new Error("PDF 모듈을 불러오지 못했습니다 (인터넷 연결 확인)")); document.head.appendChild(s); });
+const getPdfjs = () => pdfjsReady ??= loadScript(PDFJS + "pdf.min.js").then(() => loadScript(PDFJS + "pdf.worker.min.js")).then(() => window.pdfjsLib).catch(e => { pdfjsReady = null; throw e; });
+async function readPdf(f) {
+  const pdfjs = await getPdfjs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()), isEvalSupported: false }).promise;
+  const pages = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const { items } = await (await doc.getPage(i)).getTextContent();
+    // 글자 덩어리 사이의 실제 간격으로 띄어쓰기를 정한다 (pdf.js가 한글·숫자 경계에 넣는 공백을 버린다)
+    let out = "", prev = null;
+    for (const it of items) {
+      if (!it.str.trim()) { if (it.hasEOL) { out += "\n"; prev = null; } continue; }
+      const x = it.transform[4], y = it.transform[5], h = Math.hypot(it.transform[2], it.transform[3]) || 10;
+      // 한글·영숫자 사이 자동 간격(약 0.2자)은 띄어쓰기로 보지 않는다
+      if (prev) { if (Math.abs(y - prev.y) > h * 0.5) out += "\n"; else if (x - prev.end > h * 0.22) out += " "; }
+      out += it.str; prev = { y, end: x + it.width };
+      if (it.hasEOL) { out += "\n"; prev = null; }
+    }
+    pages.push(out);
+  }
+  const text = pages.join("\n")
+    // 앞 문장이 끝난 뒤 조 제목이 같은 줄에 붙어 나오면 줄을 나눈다 (본문 속 "제3조(…)에 따라" 같은 인용은 그대로 둔다)
+    .replace(/([.)\]])[ \t]+(제\s*\d+\s*조(?:\s*의\s*\d+)?\s*\()/g, "$1\n$2")
+    .replace(/\n{3,}/g, "\n\n");
+  if (!text.replace(/\s/g, "")) throw new Error("글자를 읽을 수 없는 PDF입니다 (스캔 이미지 PDF는 지원하지 않습니다)");
+  return text;
+}
 async function readFile(f) {
+  if (/\.pdf$/i.test(f.name)) return readPdf(f);
   if (/\.docx$/i.test(f.name)) {
     if (!window.mammoth) throw new Error("docx 모듈을 불러오지 못했습니다");
     const { value } = await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() });
@@ -989,7 +1073,7 @@ async function readFile(f) {
 async function addFiles(files) {
   const ready = [];
   for (const f of files) {
-    if (!/\.(txt|docx)$/i.test(f.name)) { toast(`${f.name}: .txt 또는 .docx만 올릴 수 있습니다`); continue; }
+    if (!/\.(txt|docx|pdf)$/i.test(f.name)) { toast(`${f.name}: .txt, .docx, .pdf만 올릴 수 있습니다`); continue; }
     try { ready.push({ name: f.name, text: await readFile(f) }); }
     catch (e) { toast(`${f.name}: ${e.message}`); }
   }
@@ -1021,7 +1105,7 @@ document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => setTab(
 $("#piiClose").onclick = () => { $("#piiModal").hidden = true; };
 document.addEventListener("keydown", e => { if (e.key === "Escape") $("#piiModal").hidden = true; });
 
-const csvTargets = { csvUsers: ["users", "user_id"], csvKeywords: ["keywords", "keyword"], csvExpected: ["expected", "change_id"], csvDocs: ["docsMeta", "doc_id"] };
+const csvTargets = { csvUsers: ["users", "user_id"], csvKeywords: ["keywords", "keyword"], csvExpected: ["expected", "change_id"], csvDocs: ["docsMeta", "doc_id"], csvHistory: ["history", "month"] };
 Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
   const text = await readFile(f);

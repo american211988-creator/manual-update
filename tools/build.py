@@ -4,6 +4,7 @@
 - public/index.html : 브라우저·Vercel에서 바로 여는 완성본 (오프라인 동작, 엑셀 내보내기만 CDN 필요)
 """
 import json
+import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -22,13 +23,20 @@ def main() -> None:
         ],
         "csv": {
             name: read(DATA / f"{name}.csv")
-            for name in ("documents", "users", "classification_keywords", "expected_changes")
+            for name in ("documents", "users", "classification_keywords", "expected_changes", "change_history")
         },
         "mails": [
             {"name": p.name, "text": read(p)}
             for p in sorted((DATA / "mail_samples").glob("*.txt"))
         ],
     }
+    # 엑셀 내려받기는 받은 양식(changes_template.xlsx)의 서식을 그대로 쓴다
+    with zipfile.ZipFile(DATA / "changes_template.xlsx") as z:
+        sample["xlsxTemplate"] = {
+            "styles": z.read("xl/styles.xml").decode("utf-8"),
+            "theme": z.read("xl/theme/theme1.xml").decode("utf-8"),
+            "sheet": z.read("xl/worksheets/sheet1.xml").decode("utf-8"),
+        }
     payload = json.dumps(sample, ensure_ascii=False).replace("</", "<\\/")
     src = read(ROOT / "app" / "src.html")
     out = src.replace("/*__SAMPLE_DATA__*/null", payload)
