@@ -482,7 +482,7 @@ function classify(name, text) {
 function versionNum(v) { return (v.match(/[\d.]+/)?.[0] || "0").split(".").map(Number).reduce((a, n, i) => a + n / Math.pow(1000, i), 0); }
 
 function groupLibrary() {
-  const parsed = state.library.map(parseDoc);
+  const parsed = state.library.map(f => ({ ...parseDoc(f), addedAt: f.addedAt || 0 }));
   const groups = new Map();
   for (const d of parsed) {
     const key = d.articles.length ? d.title : "__single__" + d.name;
@@ -490,11 +490,14 @@ function groupLibrary() {
     groups.get(key).push(d);
   }
   // 같은 문서·같은 버전 파일이 여러 개면(예: txt와 pdf) 가장 나중에 올린 파일만 쓴다
-  return [...groups.values()].map(list => {
+  const out = [...groups.values()].map(list => {
     const byVer = new Map();
     list.forEach(d => { const k = d.version || d.name; if (byVer.has(k)) d.replaces = byVer.get(k).name; byVer.set(k, d); });
     return [...byVer.values()].sort((a, b) => versionNum(a.version) - versionNum(b.version));
   });
+  // 최근에 올린 파일이 있는 문서를 맨 위로 (샘플은 원래 순서대로 아래)
+  const latest = g => Math.max(0, ...g.map(d => d.addedAt || 0));
+  return out.map((g, i) => [g, i]).sort((a, b) => latest(b[0]) - latest(a[0]) || a[1] - b[1]).map(([g]) => g);
 }
 
 /* ---------- 비교 ---------- */
@@ -574,11 +577,13 @@ function runGroup(list) {
     eff: newDoc.eff || today(), owner: newDoc.meta?.owner_name || "", detectedAt: nowStr(),
     total, changes: changes.map((c, i) => ({ ...c, note: edited.get(keyOf(c)) ?? c.note, id: `CHG-${docId}-${String(i + 1).padStart(2, "0")}` })),
   };
-  state.runs = state.runs.filter(r => r.id !== run.id && !(r.docId === docId && r.newVer === run.newVer)).concat(run);
+  state.runs = [run, ...state.runs.filter(r => r.id !== run.id && !(r.docId === docId && r.newVer === run.newVer))];   // 최신 결과가 맨 앞
   notify(run);
   return run;
 }
 
+// 여러 문서를 비교할 때 문서함 순서(위→아래)가 결과 순서(앞→뒤)와 같도록 뒤에서부터 비교한다
+function runGroups(groups) { return groups.slice().reverse().map(runGroup).filter(Boolean).reverse(); }
 function counts(changes) { const c = { 개정: 0, 신설: 0, 삭제: 0 }; changes.forEach(x => c[x.type]++); return c; }
 
 /* ---------- 알림 ---------- */
@@ -649,6 +654,7 @@ function renderLibrary() {
         <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">
           <h3>${esc(last.articles.length ? last.title : last.name)}</h3>
           <span class="stamp ${typeCls}">${esc(last.cls.type)}</span>
+          ${list.some(d => state.lastBatch?.has(d.name)) ? `<span class="stamp t-warn">방금 추가</span>` : ""}
           ${run ? `<span class="muted">변경 ${run.changes.length}건 감지</span>` : ""}
         </div>
         <div class="files">${list.map(d => `<span class="file">${esc(d.name)}${d.version ? " · " + esc(d.version) : ""}${d.articles.length ? ` · ${d.articles.length}개 조항` : ""}${d.replaces ? ` · 같은 버전 ${esc(d.replaces)} 대신 사용` : ""}</span>`).join("")}</div>
@@ -859,10 +865,17 @@ function renderLcd() {
 }
 function renderAll() { renderLcd(); renderLibrary(); renderChanges(); renderVerify(); renderInbox(); renderStats(); renderRef(); }
 
+/* 화면이 목록 아래쪽에 내려가 있으면 해당 탭 내용의 맨 위로 올린다 (새 결과는 목록 맨 위에 있다) */
+function showTop(t) {
+  const el = $("#tab-" + t); if (!el || el.hidden) return;
+  const y = el.getBoundingClientRect().top + window.scrollY - $("#tabs").offsetHeight - 12;
+  if (window.scrollY > y) window.scrollTo({ top: Math.max(0, y), behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
 function setTab(t) {
   state.tab = t;
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === t));
   document.querySelectorAll("section.panel").forEach(s => s.hidden = s.id !== "tab-" + t);
+  showTop(t);
   try { localStorage.setItem(STORE_KEY + ":tab", t); } catch (e) {}
 }
 
@@ -1099,10 +1112,13 @@ async function addFiles(files) {
   if (!ready.length) { if (skipped.length) toast(skipped.join(" / "), 6000); return; }
   // 개인정보가 한 파일이라도 있으면 이번 업로드 전체를 반영하지 않는다
   if (blockIfPII("업로드", ready.map(f => ({ source: f.name, findings: [...scanPII(f.name).map(x => ({ ...x, line: 0 })), ...scanPII(f.text)] })))) return;
-  for (const f of ready) state.library = state.library.filter(x => x.name !== f.name).concat({ ...f, uploaded: true });
+  const now = Date.now();
+  for (const f of ready) state.library = state.library.filter(x => x.name !== f.name).concat({ ...f, uploaded: true, addedAt: now });
+  state.lastBatch = new Set(ready.map(f => f.name));
   const names = new Set(ready.map(f => f.name));   // 내용이 바뀐 파일로 만든 비교 결과는 지운다
   state.runs = state.runs.filter(r => !names.has(r.oldName) && !names.has(r.newName));
-  save(); renderAll(); toast(`${ready.length}개 파일을 문서함에 추가했습니다${skipMsg}`, skipped.length ? 6000 : 2200);
+  save(); renderAll(); showTop("library");
+  toast(`${ready.length}개 파일을 문서함에 추가했습니다${skipMsg}`, skipped.length ? 6000 : 2200);
 }
 $("#fileInput").onchange = e => { addFiles([...e.target.files]); e.target.value = ""; };
 const drop = $("#drop");
@@ -1113,7 +1129,7 @@ drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); addFiles
 $("#runAllBtn").onclick = () => {
   const groups = groupLibrary().filter(g => g.length >= 2);
   if (blockIfPII("비교 작업", groups.flatMap(groupPII))) return;
-  const done = groups.map(runGroup).filter(Boolean);
+  const done = runGroups(groups);
   state.currentRun = done[0]?.id || null; save(); renderAll();
   toast(`${done.length}개 문서를 비교했습니다 · 변경 ${done.reduce((a, r) => a + r.changes.length, 0)}건`);
   setTab("changes");
@@ -1142,7 +1158,7 @@ function boot(reset) {
   state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false }));
   if (reset || !restore()) {
     if (reset) { loadRef(); state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })); }
-    groupLibrary().forEach(runGroup);   // 처음 열면 샘플 3세트를 바로 비교해 둔다
+    runGroups(groupLibrary());   // 처음 열면 샘플 3세트를 바로 비교해 둔다
     save();
   }
   renderAll();
