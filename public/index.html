@@ -88,6 +88,10 @@ td.clause { white-space: nowrap; font-weight: 600; }
 td.txt { min-width: 220px; max-width: 360px; }
 tr.empty td { color: var(--muted); text-align: center; padding: 24px; }
 table.cmp td.note input { width: 100%; min-width: 140px; }
+td.txt > div + div, td.txt > div + table, td.txt > table + div { margin-top: 6px; }
+table.mini { width: auto; margin-top: 6px; font-size: 0.8rem; border: 1px solid var(--line); background: var(--surface); }
+table.mini th, table.mini td { padding: 3px 8px; border: 1px solid var(--line); position: static; white-space: nowrap; }
+table.mini th { background: var(--paper); }
 
 .stamp { display: inline-block; padding: 1px 8px; border-radius: 3px; font-weight: 600; font-size: 0.78rem; border: 1px solid currentColor; white-space: nowrap; }
 .t-개정 { color: var(--rev); background: var(--rev-bg); }
@@ -529,14 +533,59 @@ function tokenDiff(a, b) {
   }
   return ops;
 }
-function cellHtml(x, side) {   // 현행(old)·개정(new) 칸: 바뀐 부분 표시, 신설·삭제는 괄호 안내
-  if (x.type === "개정") return diffHtml(tokenDiff(x.before, x.after), side);
-  const t = side === "old" ? x.before : x.after;
-  return t ? (side === "old" ? `<u class="old">${esc(t)}</u>` : `<ins>${esc(t)}</ins>`) : `<span class="muted">${side === "old" ? "(신설)" : "(삭제)"}</span>`;
+function cellHtml(x, side) {   // 현행(old)·개정(new) 칸: 바뀐 부분 표시, 표는 작은 표로, 신설·삭제는 괄호 안내
+  const seg = sg => sg.mark === "old" ? `<u class="old">${esc(sg.t)}</u>` : sg.mark === "new" ? `<ins>${esc(sg.t)}</ins>` : sg.mark === "muted" ? `<span class="muted">${esc(sg.t)}</span>` : esc(sg.t);
+  return toBlocks(diffSegs(x, side)).map(b => b.type === "p" ? `<div>${b.segs.map(seg).join("")}</div>`
+    : `<table class="mini">${b.rows.map((r, ri) => `<tr>${r.map(c => `<${ri ? "td" : "th"}>${c.map(seg).join("")}</${ri ? "td" : "th"}>`).join("")}</tr>`).join("")}</table>`).join("");
 }
-function diffHtml(ops, side) {
-  return ops.filter(([o]) => o === "=" || o === (side === "old" ? "-" : "+"))
-    .map(([o, w]) => o === "=" ? esc(w) : side === "old" ? `<u class="old">${esc(w)}</u>` : `<ins>${esc(w)}</ins>`).join(" ");
+/* 표가 들어 있는 조항: Word 표는 '[표] 칸 | 칸 / 칸 | 칸 [/표]'로 읽어 둔다.
+   신구 표 모양(행·열 수)이 같으면 같은 위치의 칸끼리 비교하고, 비고에 '행·열: 이전 → 이후'를 적는다.
+   모양이 다르면 단어 단위 비교로 돌아간다. */
+const TABLE_RE = /\[표\] (.*?) \[\/표\]/g;
+function splitTableSegs(text) {
+  const out = []; let last = 0;
+  for (const m of text.matchAll(TABLE_RE)) {
+    if (m.index > last) out.push({ kind: "text", s: text.slice(last, m.index).trim() });
+    out.push({ kind: "table", rows: m[1].split(" / ").map(r => r.split(" | ")) });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) out.push({ kind: "text", s: text.slice(last).trim() });
+  return out.filter(x => x.kind === "table" || x.s);
+}
+const diffCache = new Map();
+function diffOps(a, b) {
+  const ck = a + "\u0000" + b;
+  if (diffCache.has(ck)) return diffCache.get(ck);
+  const A = splitTableSegs(a), B = splitTableSegs(b);
+  const sameShape = A.length === B.length && A.some(x => x.kind === "table") && A.every((x, i) => x.kind === B[i].kind &&
+    (x.kind === "text" || (x.rows.length === B[i].rows.length && x.rows.every((r, j) => r.length === B[i].rows[j].length))));
+  let res;
+  if (!sameShape) { const ops = tokenDiff(a, b); res = { ops, note: autoNote(ops) }; }
+  else {
+    const ops = [], notes = [];
+    A.forEach((x, i) => {
+      const y = B[i];
+      if (ops.length) ops.push(["=", ""]);
+      if (x.kind === "text") { const o = tokenDiff(x.s, y.s); ops.push(...o); const n = autoNote(o); if (n) notes.push(n); return; }
+      ops.push(["=", "[표]"]);
+      x.rows.forEach((r, ri) => {
+        if (ri) ops.push(["=", "/"]);
+        r.forEach((c, ci) => {
+          if (ci) ops.push(["=", "|"]);
+          const d = y.rows[ri][ci];
+          if (c === d) { ops.push(["=", c]); return; }
+          ops.push(["-", c], ["+", d]);
+          const label = [x.rows[ri][0], x.rows[0][ci]].filter((v, k) => v && !(k === 0 && ci === 0)).join("·");
+          notes.push(`${label ? label + ": " : ""}${c || "∅"} → ${d || "∅"}`);
+        });
+      });
+      ops.push(["=", "[/표]"]);
+    });
+    res = { ops: ops.filter(([o, w], k) => !(o === "=" && w === "" && k === 0)), note: notes.join(", ") };
+  }
+  if (diffCache.size > 500) diffCache.clear();
+  diffCache.set(ck, res);
+  return res;
 }
 function autoNote(ops) {
   const pairs = []; let del = [], add = [];
@@ -557,8 +606,8 @@ function compareDocs(oldDoc, newDoc) {
     const o = O.get(k), n = N.get(k);
     if (o && n) {
       if (o.body === n.body && o.title === n.title) continue;
-      const ops = tokenDiff(o.body, n.body);
-      const note = o.title !== n.title ? `조문 제목 변경(${o.title} → ${n.title})` + (o.body !== n.body ? ", " + autoNote(ops) : "") : autoNote(ops);
+      const d = diffOps(o.body, n.body);
+      const note = o.title !== n.title ? `조문 제목 변경(${o.title} → ${n.title})` + (o.body !== n.body ? ", " + d.note : "") : d.note;
       changes.push({ section: `${k}(${n.title})`, type: "개정", before: o.body, after: n.body, note, auto: note });
     } else if (n) {
       changes.push({ section: `${k}(${n.title})`, type: "신설", before: "", after: n.body, note: "조항 신설", auto: "조항 신설" });
@@ -730,7 +779,6 @@ function renderChanges() {
   if (state.currentRun === "__all__") { el.innerHTML = renderUnified(runs); return; }
   const r = runs.find(x => x.id === state.currentRun);
   const c = counts(r.changes);
-  const ruleOps = r.changes.map(x => x.type === "개정" ? tokenDiff(x.before, x.after) : null);
   el.innerHTML = `
     <div class="facts">
       <div><span class="eyebrow">문서</span><b style="font-family:var(--font-body)">${esc(r.title)}</b><span class="muted mono">${esc(r.docId)}</span></div>
@@ -745,8 +793,8 @@ function renderChanges() {
         <thead><tr><th>조항</th><th>현행</th><th>개정</th><th>변경유형</th><th>비고</th></tr></thead>
         <tbody>${r.changes.map((x, i) => `<tr>
           <td class="clause">${esc(x.section)}</td>
-          <td class="txt">${ruleOps[i] ? diffHtml(ruleOps[i], "old") : x.before ? `<u class="old">${esc(x.before)}</u>` : `<span class="muted">(신설)</span>`}</td>
-          <td class="txt">${ruleOps[i] ? diffHtml(ruleOps[i], "new") : x.after ? `<ins>${esc(x.after)}</ins>` : `<span class="muted">(삭제)</span>`}</td>
+          <td class="txt">${cellHtml(x, "old")}</td>
+          <td class="txt">${cellHtml(x, "new")}</td>
           <td>${stamp(x.type)}</td>
           <td class="note"><input type="text" id="note-${esc(x.id)}" data-i="${i}" value="${esc(x.note)}" aria-label="${esc(x.section)} 비고"></td>
         </tr>`).join("") || `<tr class="empty"><td colspan="5">변경된 조항이 없습니다.</td></tr>`}</tbody>
@@ -941,11 +989,50 @@ const HEAD = ["조항", "현행", "개정", "변경유형", "비고"];
 /* 바뀐 부분 표시용 조각: old = 현행에서 바뀌는 부분(밑줄+굵게), new = 개정에서 바뀐 부분(굵게), muted = (신설)/(삭제) */
 function diffSegs(x, side) {
   if (x.type === "개정") {
-    const ops = tokenDiff(x.before, x.after).filter(([o]) => o === "=" || o === (side === "old" ? "-" : "+"));
+    const ops = diffOps(x.before, x.after).ops.filter(([o]) => o === "=" || o === (side === "old" ? "-" : "+"));
     return ops.flatMap(([o, w], i) => [...(i ? [{ t: " " }] : []), { t: w, mark: o === "=" ? null : side }]);
   }
   const t = side === "old" ? x.before : x.after;
-  return t ? [{ t, mark: side }] : [{ t: side === "old" ? "(신설)" : "(삭제)", mark: "muted" }];
+  return t ? markSegs(t, side) : [{ t: side === "old" ? "(신설)" : "(삭제)", mark: "muted" }];
+}
+function xlSegs(segs) {   // 엑셀 한 칸용: 문단·표 행은 줄바꿈, 표 칸은 ' | '
+  const out = [];
+  toBlocks(segs).forEach((b, i) => {
+    if (i) out.push({ t: "\n" });
+    if (b.type === "p") { out.push(...b.segs); return; }
+    b.rows.forEach((r, ri) => { if (ri) out.push({ t: "\n" }); r.forEach((c, ci) => { if (ci) out.push({ t: " | " }); out.push(...c); }); });
+  });
+  return out;
+}
+function markSegs(text, mark) {   // 신설·삭제 조항: 전체에 같은 표시, 표는 칸 단위 조각으로
+  const out = [];
+  splitTableSegs(text).forEach((x, i) => {
+    if (i) out.push({ t: " " });
+    if (x.kind === "text") { out.push({ t: x.s, mark }); return; }
+    out.push({ t: "[표]" });
+    x.rows.forEach((r, ri) => { if (ri) out.push({ t: "/" }); r.forEach((c, ci) => { if (ci) out.push({ t: "|" }); out.push({ t: c, mark }); }); });
+    out.push({ t: "[/표]" });
+  });
+  return out;
+}
+/* 조각 → 블록: [{type:"p", segs}] 또는 [{type:"table", rows:[[segs...]]}] — 화면·워드·엑셀이 같은 결과로 그린다 */
+function toBlocks(segs) {
+  const blocks = []; let para = null, table = null, row = null, cell = null;
+  for (const sg of segs) {
+    if (!table && sg.t === "[표]") { table = { type: "table", rows: [] }; blocks.push(table); row = []; cell = []; row.push(cell); table.rows.push(row); para = null; continue; }
+    if (table) {
+      if (sg.t === "[/표]") { table = null; continue; }
+      if (sg.t === "/") { row = []; cell = []; row.push(cell); table.rows.push(row); continue; }
+      if (sg.t === "|") { cell = []; row.push(cell); continue; }
+      if (!sg.t.trim() && !cell.length) continue;
+      cell.push(sg); continue;
+    }
+    if (!para) { if (!sg.t.trim()) continue; para = { type: "p", segs: [] }; blocks.push(para); }
+    para.segs.push(sg);
+  }
+  const trim = list => { while (list.length && !list[list.length - 1].t.trim()) list.pop(); return list; };   // 끝 공백 조각 제거
+  blocks.forEach(b => b.type === "p" ? trim(b.segs) : b.rows.forEach(r => r.forEach(trim)));
+  return blocks;
 }
 function currentRows() {
   if (state.currentRun === "__all__")
@@ -1005,11 +1092,11 @@ $("#xlsxBtn").onclick = () => {
     const c = counts(r.changes);
     return { name: `${r.title} ${r.newVer}`, title: `${r.title} 변경대비표`, head: HEAD,
       meta: `${r.oldVer} → ${r.newVer} · 시행일 ${r.eff} · 문서유형 ${r.docType} · 변경 ${r.changes.length}건 (개정 ${c.개정} · 신설 ${c.신설} · 삭제 ${c.삭제}) · 작성일 ${today()}`,
-      rows: r.changes.map(x => [x.section, diffSegs(x, "old"), diffSegs(x, "new"), x.type, x.note]) };
+      rows: r.changes.map(x => [x.section, xlSegs(diffSegs(x, "old")), xlSegs(diffSegs(x, "new")), x.type, x.note]) };
   });
   if (vr.length > 1) sheets.push({ name: "통합정리본", title: "변경대비표 통합 정리본", head: ["문서", ...HEAD],
     meta: `문서 ${vr.length}종 · 변경 ${vr.reduce((a, r) => a + r.changes.length, 0)}건 · 작성일 ${today()}`,
-    rows: vr.flatMap(r => r.changes.map(x => [r.title, x.section, diffSegs(x, "old"), diffSegs(x, "new"), x.type, x.note])) });
+    rows: vr.flatMap(r => r.changes.map(x => [r.title, x.section, xlSegs(diffSegs(x, "old")), xlSegs(diffSegs(x, "new")), x.type, x.note])) });
   let blob;
   try { blob = buildXlsx(sheets); } catch (e) { return toast("엑셀 파일을 만들지 못했습니다. ‘표 복사’를 사용하세요."); }
   saveBlob(blob, `변경대비표_${today()}.xlsx`, "엑셀");
@@ -1056,6 +1143,13 @@ function wCell(content, w, fill) {
 }
 const W_MARK = { old: { b: true, u: true, color: "AE2A20" }, new: { b: true, color: "1C5FBF", hl: "E3ECF8" }, muted: { color: "7A7368" } };
 const segRuns = segs => segs.map(sg => wRun(sg.t, sg.mark ? W_MARK[sg.mark] : {})).join("");
+function wCellBlocks(segs, w) {   // 문단은 문단으로, 표는 칸 안의 작은 표로 (칸은 문단으로 끝나야 한다)
+  const bd = ["top", "left", "bottom", "right", "insideH", "insideV"].map(b => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="B8B2A7"/>`).join("");
+  const body = toBlocks(segs).map(b => b.type === "p" ? wPara(segRuns(b.segs))
+    : `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${bd}</w:tblBorders><w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar></w:tblPr>${b.rows.map((r, ri) =>
+        `<w:tr>${r.map(c => `<w:tc><w:tcPr>${ri ? "" : '<w:shd w:val="clear" w:color="auto" w:fill="EEE9DF"/>'}</w:tcPr>${wPara(c.map(sg => wRun(sg.t, { ...(sg.mark ? W_MARK[sg.mark] : {}), sz: 16 })).join(""))}</w:tc>`).join("")}</w:tr>`).join("")}</w:tbl>`).join("");
+  return `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/></w:tcPr>${body}${body.endsWith("</w:p>") ? "" : "<w:p/>"}</w:tc>`;
+}
 function docxBody(runs) {
   const W = [2300, 4700, 4700, 1100, 1770];   // A4 가로, 좌우 여백 2cm 기준 14,570twip
   const border = ["top", "left", "bottom", "right", "insideH", "insideV"].map(b => `<w:${b} w:val="single" w:sz="4" w:space="0" w:color="9A948A"/>`).join("");
@@ -1064,8 +1158,7 @@ function docxBody(runs) {
   return runs.map((r, idx) => {
     const c = counts(r.changes);
     const rows = r.changes.map(x => {
-      const before = segRuns(diffSegs(x, "old")), after = segRuns(diffSegs(x, "new"));
-      return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${wCell(wRun(x.section, { b: true }), W[0])}${wCell(before, W[1])}${wCell(after, W[2])}${wCell(wRun(x.type, { b: true, color: TYPE_COLOR[x.type] }), W[3])}${wCell(wRun(x.note), W[4])}</w:tr>`;
+      return `<w:tr><w:trPr><w:cantSplit/></w:trPr>${wCell(wRun(x.section, { b: true }), W[0])}${wCellBlocks(diffSegs(x, "old"), W[1])}${wCellBlocks(diffSegs(x, "new"), W[2])}${wCell(wRun(x.type, { b: true, color: TYPE_COLOR[x.type] }), W[3])}${wCell(wRun(x.note), W[4])}</w:tr>`;
     }).join("");
     const table = r.changes.length
       ? `<w:tbl><w:tblPr><w:tblW w:w="${W.reduce((a, b) => a + b)}" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblBorders>${border}</w:tblBorders><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${W.map(w => `<w:gridCol w:w="${w}"/>`).join("")}</w:tblGrid>${header}${rows}</w:tbl>`
@@ -1197,13 +1290,30 @@ async function readXlsx(f) {
   if (!lines.length) throw new Error("엑셀 첫 번째 시트에 글자가 없습니다");
   return lines.join("\n");
 }
+function docxHtmlToText(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html"), lines = [];
+  const clean = el => (el.textContent || "").replace(/\s+/g, " ").trim();
+  const walk = node => {
+    for (const el of node.children) {
+      if (el.tagName === "TABLE") {
+        const rows = [...el.querySelectorAll("tr")].filter(tr => tr.closest("table") === el)
+          .map(tr => [...tr.children].map(td => clean(td).replace(/[|/]/g, "·")).join(" | "));
+        if (rows.length) lines.push(`[표] ${rows.join(" / ")} [/표]`);
+      } else if (/^(P|H[1-6]|LI)$/.test(el.tagName)) { const t = clean(el); if (t) lines.push(t); }
+      else walk(el);
+    }
+  };
+  walk(doc.body);
+  return lines.join("\n");
+}
 async function readFile(f) {
   if (/\.pdf$/i.test(f.name)) return readPdf(f);
   if (/\.xlsx$/i.test(f.name)) return readXlsx(f);
   if (/\.docx$/i.test(f.name)) {
     if (!window.mammoth) throw new Error("docx 모듈을 불러오지 못했습니다");
-    const { value } = await mammoth.extractRawText({ arrayBuffer: await f.arrayBuffer() });
-    return value;
+    // 표의 칸 구분을 살리려고 HTML로 변환한 뒤 문단은 줄로, 표는 '[표] 칸 | 칸 / … [/표]' 한 줄로 바꾼다 (그림은 버림)
+    const { value } = await mammoth.convertToHtml({ arrayBuffer: await f.arrayBuffer() }, { convertImage: mammoth.images.imgElement(() => ({ src: "" })) });
+    return docxHtmlToText(value);
   }
   const buf = await f.arrayBuffer();
   try { return new TextDecoder("utf-8", { fatal: true }).decode(buf).replace(/^﻿/, ""); }

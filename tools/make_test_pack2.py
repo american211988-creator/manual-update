@@ -195,7 +195,8 @@ def apply(old, chg):
 
 def body(a, tables):
     t = tables.get(key(a))
-    return " ".join(a[3]) + (" " + " ".join(c for row in t for c in row) if t else "")
+    # 앱은 Word 표를 '[표] 칸 | 칸 / 칸 | 칸 [/표]'로 읽는다
+    return " ".join(a[3]) + (" [표] " + " / ".join(" | ".join(row) for row in t) + " [/표]" if t else "")
 
 
 def expected_rows(doc_id, title, old, new, chg, t_old, t_new):
