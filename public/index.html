@@ -88,6 +88,11 @@ td.clause { white-space: nowrap; font-weight: 600; }
 td.txt { min-width: 220px; max-width: 360px; }
 tr.empty td { color: var(--muted); text-align: center; padding: 24px; }
 table.cmp td.note input { width: 100%; min-width: 140px; }
+.note-edit { display: flex; gap: 6px; align-items: center; min-width: 190px; }
+.note-edit input { flex: 1; min-width: 0; }
+.note-edit.dirty input { border-color: var(--accent); background: var(--accent-weak); }
+.note-edit .btn.save { flex: none; }
+.note-hint { font-size: 0.72rem; color: var(--accent); margin-top: 3px; }
 td.txt > div + div, td.txt > div + table, td.txt > table + div { margin-top: 6px; }
 table.mini { width: auto; margin-top: 6px; font-size: 0.8rem; border: 1px solid var(--line); background: var(--surface); }
 table.mini th, table.mini td { padding: 3px 8px; border: 1px solid var(--line); position: static; white-space: nowrap; }
@@ -426,7 +431,7 @@ const state = {
   library: [],      // {name, text, uploaded}
   runs: [],         // 비교 결과
   notices: [],      // 알림
-  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null,
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null, noteDrafts: {},
 };
 function loadRef() {
   state.docsMeta = parseCSV(SAMPLE.csv.documents);
@@ -630,6 +635,7 @@ function runGroup(list) {
   const oldDoc = list[list.length - 2], newDoc = list[list.length - 1];
   const { changes, total } = compareDocs(oldDoc, newDoc);
   const docId = baseDocId(list);
+  Object.keys(state.noteDrafts).forEach(k => { if (k.startsWith(`CHG-${docId}-`)) delete state.noteDrafts[k]; });   // 다시 비교하면 저장 안 된 비고는 버린다
   // 다시 비교해도 담당자가 고친 비고는 유지한다
   const prev = state.runs.find(r => r.docId === docId && r.newVer === newDoc.version);
   const keyOf = c => [c.section, c.type, c.before, c.after].join("\u0001");
@@ -788,7 +794,8 @@ function renderChanges() {
       <div><span class="eyebrow">변경률</span><b>${pct(r.changes.length / (r.total || 1))}</b><span class="muted">${r.changes.length} / 전체 ${r.total}개 조항</span></div>
     </div>
     <div class="box">
-      <div class="bar"><h2>변경대비표</h2><span class="muted">비고는 자동 작성되며 직접 고칠 수 있습니다.</span></div>
+      <div class="bar"><h2>변경대비표</h2><div><span class="muted">비고는 자동 작성되며, 고친 뒤 ‘저장’을 눌러야 반영됩니다.</span>
+        <span class="muted" id="dirtyCount"></span><button class="btn small primary" id="saveAllNotes" type="button" hidden>고친 비고 모두 저장</button></div></div>
       <div class="scroll"><table class="cmp">
         <thead><tr><th>조항</th><th>현행</th><th>개정</th><th>변경유형</th><th>비고</th></tr></thead>
         <tbody>${r.changes.map((x, i) => `<tr>
@@ -796,7 +803,9 @@ function renderChanges() {
           <td class="txt">${cellHtml(x, "old")}</td>
           <td class="txt">${cellHtml(x, "new")}</td>
           <td>${stamp(x.type)}</td>
-          <td class="note"><input type="text" id="note-${esc(x.id)}" data-i="${i}" value="${esc(x.note)}" aria-label="${esc(x.section)} 비고"></td>
+          <td class="note">${(() => { const draft = state.noteDrafts[x.id], dirty = draft !== undefined && draft !== x.note; return `<div class="note-edit${dirty ? " dirty" : ""}">
+            <input type="text" id="note-${esc(x.id)}" data-i="${i}" value="${esc(dirty ? draft : x.note)}" aria-label="${esc(x.section)} 비고">
+            <button class="btn small primary save" data-i="${i}" type="button"${dirty ? "" : " hidden"}>저장</button></div>${dirty ? `<div class="note-hint">저장 안 됨 · Enter 저장 · Esc 되돌리기</div>` : ""}`; })()}</td>
         </tr>`).join("") || `<tr class="empty"><td colspan="5">변경된 조항이 없습니다.</td></tr>`}</tbody>
       </table></div>
       <div class="bar"><p class="muted">원본: <span class="mono">${esc(r.oldName)}</span> → <span class="mono">${esc(r.newName)}</span> · 감지 ${esc(r.detectedAt)}${r.owner ? " · 문서 담당 " + esc(r.owner) : ""}</p>
@@ -812,11 +821,41 @@ function renderChanges() {
     state.notices = state.notices.filter(n => n.runId !== r.id);
     state.confirmDelete = null; state.currentRun = null; save(); renderAll(); toast(`${r.title} ${r.newVer} 비교 결과를 지웠습니다`);
   };
-  el.querySelectorAll("td.note input").forEach(inp => inp.onchange = () => {
-    const x = r.changes[+inp.dataset.i];
-    if (blockIfPII("비고 저장", [{ source: x.section + " 비고", findings: scanPII(inp.value) }])) { inp.value = x.note; return; }
-    x.note = inp.value; save();
+  // 비고: 고치면 '저장' 버튼이 나타나고, 저장해야 결과(내려받기·표 복사)에 반영된다. 저장 전 내용은 문서를 바꿔 봐도 남아 있다.
+  const refreshDirty = () => {
+    const n = r.changes.filter(x => state.noteDrafts[x.id] !== undefined && state.noteDrafts[x.id] !== x.note).length;
+    $("#dirtyCount").textContent = n ? `저장 안 된 비고 ${n}건` : "";
+    $("#saveAllNotes").hidden = n < 2;
+  };
+  const setDirtyUI = (inp, dirty) => {
+    const box = inp.closest(".note-edit"); box.classList.toggle("dirty", dirty);
+    box.querySelector(".save").hidden = !dirty;
+    let hint = box.parentElement.querySelector(".note-hint");
+    if (dirty && !hint) { hint = document.createElement("div"); hint.className = "note-hint"; hint.textContent = "저장 안 됨 · Enter 저장 · Esc 되돌리기"; box.after(hint); }
+    if (!dirty && hint) hint.remove();
+  };
+  const saveNote = (i, quiet) => {
+    const x = r.changes[i], inp = el.querySelector(`input[data-i="${i}"]`), v = inp.value.trim();
+    if (blockIfPII("비고 저장", [{ source: x.section + " 비고", findings: scanPII(v) }])) return false;
+    x.note = v; delete state.noteDrafts[x.id]; inp.value = v; setDirtyUI(inp, false); refreshDirty();
+    if (!quiet) { save(); toast(`${x.section} 비고를 저장했습니다`); }
+    return true;
+  };
+  el.querySelectorAll("td.note input").forEach(inp => {
+    const i = +inp.dataset.i, x = r.changes[i];
+    inp.oninput = () => { const dirty = inp.value !== x.note; if (dirty) state.noteDrafts[x.id] = inp.value; else delete state.noteDrafts[x.id]; setDirtyUI(inp, dirty); refreshDirty(); };
+    inp.onkeydown = e => {
+      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); if (state.noteDrafts[x.id] !== undefined) saveNote(i); }
+      if (e.key === "Escape") { inp.value = x.note; delete state.noteDrafts[x.id]; setDirtyUI(inp, false); refreshDirty(); }
+    };
   });
+  el.querySelectorAll("td.note .save").forEach(b => b.onclick = () => saveNote(+b.dataset.i));
+  $("#saveAllNotes").onclick = () => {
+    const idx = r.changes.map((x, i) => state.noteDrafts[x.id] !== undefined ? i : -1).filter(i => i >= 0);
+    const ok = idx.filter(i => saveNote(i, true)).length;
+    save(); if (ok) toast(`비고 ${ok}건을 저장했습니다`);
+  };
+  refreshDirty();
 }
 
 function renderUnified(runs) {
@@ -1378,7 +1417,7 @@ Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange =
 /* ---------- 시작 ---------- */
 function boot(reset) {
   loadRef();
-  state.runs = []; state.notices = []; state.currentRun = null; state.currentMsg = null;
+  state.runs = []; state.notices = []; state.currentRun = null; state.currentMsg = null; state.noteDrafts = {};
   state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false }));
   if (reset || !restore()) {
     if (reset) { loadRef(); state.library = SAMPLE.files.map(f => ({ ...f, uploaded: false })); }
