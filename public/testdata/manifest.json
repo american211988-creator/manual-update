@@ -1,0 +1,39 @@
+{
+ "sets": [
+  {
+   "key": "pack1",
+   "label": "시험용 1차",
+   "dir": "testdata/test_pack/",
+   "files": [
+    "계약심사_전결_내규_v1.5.docx",
+    "계약심사_전결_내규_v2.0.docx",
+    "보험금지급_사무처리기준_v2.1.pdf",
+    "보험금지급_사무처리기준_v3.0.pdf",
+    "스캔본_예시_업무매뉴얼_v1.0.pdf",
+    "언더라이팅_업무매뉴얼_v3.0.docx",
+    "언더라이팅_업무매뉴얼_v4.0.docx"
+   ],
+   "meta": "documents_testpack.csv",
+   "expected": "expected_changes_testpack.csv",
+   "metrics": "expected_metrics_testpack.csv"
+  },
+  {
+   "key": "pack2",
+   "label": "시험용 2차",
+   "dir": "testdata/test_pack2/",
+   "files": [
+    "모집질서_준수_내규_v2.0.docx",
+    "모집질서_준수_내규_v2.1.docx",
+    "보험계약_유지관리_업무매뉴얼_v1.0.pdf",
+    "보험계약_유지관리_업무매뉴얼_v2.0.pdf",
+    "보험료_수납_사무처리기준_v1.0.xlsx",
+    "보험료_수납_사무처리기준_v1.1.xlsx",
+    "심사위원회_운영규정_v3.0.txt",
+    "심사위원회_운영규정_v3.1.txt"
+   ],
+   "meta": "documents_testpack2.csv",
+   "expected": "expected_changes_testpack2.csv",
+   "metrics": "expected_metrics_testpack2.csv"
+  }
+ ]
+}

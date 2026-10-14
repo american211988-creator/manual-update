@@ -1,0 +1,191 @@
+<title>변경대비 업데이트 검증 리포트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 앱(내규/매뉴얼 변경대비 업데이트)의 크림 종이·키캡 톤을 이어받은 한 장짜리 검증 보고서. 요약 수치 → 평가 대응 → 상세 표 → 방법·한계 순. */
+:root {
+  --paper: #EEE9DF; --surface: #FBF9F4; --ink: #2A2724; --muted: #6C655B; --line: #D9D1C3;
+  --accent: #2F6BEA; --accent-weak: #DCE6FB;
+  --ok: #1D7A3B; --ok-bg: #D3EFD9; --warn: #7A5A00; --warn-bg: #FAEB9A; --no: #B23A26; --no-bg: #F9DCD3;
+  --lcd: #F8F4EC; --led: #179A48;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1A1917; --surface: #252320; --ink: #EDE8DF; --muted: #A39B8F; --line: #3A3631;
+    --accent: #7FA4FF; --accent-weak: #1F2A44;
+    --ok: #63D486; --ok-bg: #15301E; --warn: #F2D24B; --warn-bg: #3A3212; --no: #FF9C86; --no-bg: #3D1E18;
+    --lcd: #2E2B27; --led: #3BE07A; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1A1917; --surface: #252320; --ink: #EDE8DF; --muted: #A39B8F; --line: #3A3631;
+  --accent: #7FA4FF; --accent-weak: #1F2A44;
+  --ok: #63D486; --ok-bg: #15301E; --warn: #F2D24B; --warn-bg: #3A3212; --no: #FF9C86; --no-bg: #3D1E18;
+  --lcd: #2E2B27; --led: #3BE07A; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.65 var(--font-body); }
+.wrap { max-width: 1080px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px; display: grid; gap: 22px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(1.45rem, 3.4vw, 1.95rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.15rem; font-weight: 700; }
+p { margin: 0; }
+.muted { color: var(--muted); }
+.num, .mono { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.eyebrow { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+header.lcd { background: var(--lcd); border: 1.5px solid var(--line); border-radius: 18px; padding: 18px 22px; display: grid; gap: 8px; box-shadow: 0 0 0 6px var(--surface), 0 0 0 7.5px var(--line); margin: 7px; }
+.lcd-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; align-items: center; font-family: var(--font-data); font-size: 0.82rem; color: var(--muted); }
+.led { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--led); margin-right: 6px; vertical-align: 1px; }
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1.5px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+.tile b { font: 600 1.75rem/1.1 var(--font-data); font-variant-numeric: tabular-nums; }
+.tile .sub { font-size: 0.84rem; color: var(--muted); }
+.tile.pass { border-color: var(--ok); }
+
+section { background: var(--surface); border: 1.5px solid var(--line); border-radius: 16px; padding: 18px 20px; display: grid; gap: 12px; align-content: start; min-width: 0; }
+section > p { max-width: 72ch; }
+.scroll { overflow-x: auto; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.76rem; color: var(--muted); font-weight: 600; background: var(--paper); white-space: nowrap; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+tr.sum td { font-weight: 700; background: var(--paper); }
+.pill { display: inline-block; padding: 1px 9px; border-radius: 7px; font-size: 0.78rem; font-weight: 600; border: 1.5px solid currentColor; white-space: nowrap; }
+.pill.ok { color: var(--ok); background: var(--ok-bg); }
+.pill.warn { color: var(--warn); background: var(--warn-bg); }
+.pill.no { color: var(--no); background: var(--no-bg); }
+.fmt { font: 500 0.76rem var(--font-data); padding: 1px 7px; border-radius: 5px; background: var(--paper); border: 1px solid var(--line); }
+ol, ul { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 76ch; }
+code { font-family: var(--font-data); font-size: 0.86em; background: var(--paper); padding: 0 5px; border-radius: 4px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 16px; align-items: start; }
+.two > section { height: 100%; }
+a { color: var(--accent); }
+footer { font-size: 0.8rem; color: var(--muted); }
+</style>
+
+<div class="wrap">
+  <header class="lcd">
+    <div class="lcd-row"><span>Hana Life · 내규/매뉴얼 변경대비 업데이트 PoC</span><span><span class="led"></span>검증 기준일 2026-10-14</span></div>
+    <h1>변경대비 업데이트 검증 리포트</h1>
+    <p class="muted">외부 평가(10/14 15:37)에서 미검증으로 남은 ‘새 파일 업로드·읽기’와 ‘신규 자료 기준 분류·변경 비교·알림·집계·변경률 정확도’를 보완 검증한 결과입니다. 같은 검증을 운영 사이트의 ‘정답 검증 → 운영 검증 실행’ 버튼으로 누구나 다시 돌릴 수 있습니다. 모든 회사명·금액·인명은 가상 데이터입니다.</p>
+    <div class="lcd-row"><span>대상: main 최신(PR #22 병합본) · Vercel / Claude 아티팩트 동일 버전</span><span>판정 기준: 정확도 90% 이상</span></div>
+  </header>
+
+  <div class="tiles" role="list">
+    <div class="tile pass" role="listitem"><span class="eyebrow">변경 대조 정확도</span><b>95 / 95</b><span class="sub">100% · 오탐 0건 · 기준 90% 충족</span></div>
+    <div class="tile pass" role="listitem"><span class="eyebrow">문서유형 분류</span><b>21 / 21</b><span class="sub">신규 자료 14 + 샘플 7(미분류 1 포함)</span></div>
+    <div class="tile pass" role="listitem"><span class="eyebrow">알림 대상 · 변경률</span><b>10 / 10</b><span class="sub">문서별 구독 담당자 알림, 변경률 모두 정답과 일치</span></div>
+    <div class="tile pass" role="listitem"><span class="eyebrow">월·연 집계</span><b>4 / 4</b><span class="sub">시행월 3개 + 연도 1개 개정·신설·삭제 건수</span></div>
+    <div class="tile pass" role="listitem"><span class="eyebrow">파일 읽기</span><b>22 / 22</b><span class="sub">.docx · .pdf · .xlsx · .txt, 스캔본 제외 안내 포함</span></div>
+    <div class="tile pass" role="listitem"><span class="eyebrow">회귀 시험</span><b>113 / 113</b><span class="sub">자동 점검 6종 전부 통과</span></div>
+  </div>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">외부 평가 항목 대응</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>평가 항목</th><th>평가 결과</th><th>보완 검증</th><th>판정</th></tr></thead>
+      <tbody>
+        <tr><td>가상 문서 분류·신구 비교·신설/개정/삭제·대비표·알림·집계·변경률</td><td>충족(샘플 기준)</td><td>그대로 유지, 신규 자료로 재확인</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>정답표 대조</td><td>샘플 15/15만 인정</td><td>신규 자료 80/80 추가 → 합계 95/95</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>새 파일 업로드·읽기</td><td>미검증 1개</td><td>4형식 14개 파일 업로드·조항 인식, 스캔 PDF 1개는 안내 후 제외</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>신규 자료 기준 분류 정확도</td><td>확인사항</td><td>14/14 (사무처리기준·업무매뉴얼·내규)</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>신규 자료 기준 변경률 계산</td><td>구현 인정</td><td>10개 문서 모두 정답(별도 계산)과 일치: 전체 조항·변경 건수·비율</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>신규 자료 기준 알림</td><td>샘플 기준 인정</td><td>10개 문서 모두 ‘구독 담당자 = 알림 받은 담당자’ (문서당 3명, 총 30건)</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>신규 자료 기준 월·연 집계</td><td>샘플 기준 인정</td><td>시행월 2026-07·10·11과 2026년의 개정·신설·삭제 건수 모두 일치</td><td><span class="pill ok">충족</span></td></tr>
+        <tr><td>운영 환경 재현</td><td>–</td><td>시험 자료·정답을 운영에 함께 올리고 ‘운영 검증 실행’ 버튼으로 재검증, 결과는 검증 기록으로 누적</td><td><span class="pill ok">적재</span></td></tr>
+        <tr><td>실제 메일 발송·LLM 연동</td><td>PRD상 제외/선택</td><td>화면 내 알림으로 대체 (기획서 범위)</td><td><span class="pill warn">범위 외</span></td></tr>
+        <tr><td>실제 사내 문서 기준 정확도·시간 절감</td><td>평가 범위 밖</td><td>미실시 · 다음 단계 참조</td><td><span class="pill no">미검증</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">자료 묶음별 정답 대조</h2>
+    <p class="muted">판정 규칙: 조항 번호·변경유형·현행 문구·개정 문구가 정답표와 모두 같아야 ‘일치’. 문구는 한 글자라도 다르면 불일치로 셉니다.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>묶음</th><th>형식</th><th class="num">문서 쌍</th><th class="num">정답</th><th class="num">개정·신설·삭제</th><th class="num">감지</th><th class="num">일치</th><th class="num">정확도</th></tr></thead>
+      <tbody>
+        <tr><td>기본 샘플</td><td><span class="fmt">txt</span></td><td class="num">3</td><td class="num">15</td><td class="num">9 · 3 · 3</td><td class="num">15</td><td class="num">15</td><td class="num">100%</td></tr>
+        <tr><td>시험용 1차</td><td><span class="fmt">docx</span> <span class="fmt">pdf</span></td><td class="num">3</td><td class="num">42</td><td class="num">25 · 10 · 7</td><td class="num">42</td><td class="num">42</td><td class="num">100%</td></tr>
+        <tr><td>시험용 2차</td><td><span class="fmt">pdf</span> <span class="fmt">docx</span> <span class="fmt">xlsx</span> <span class="fmt">txt</span></td><td class="num">4</td><td class="num">38</td><td class="num">22 · 9 · 7</td><td class="num">38</td><td class="num">38</td><td class="num">100%</td></tr>
+        <tr class="sum"><td>합계</td><td></td><td class="num">10</td><td class="num">95</td><td class="num">56 · 22 · 17</td><td class="num">95</td><td class="num">95</td><td class="num">100%</td></tr>
+      </tbody>
+    </table></div>
+    <p class="muted">시험용 자료에 넣은 까다로운 경우: 표 안 금액만 바뀐 조항(2건), 조문 제목만 바뀐 조항, ①② 여러 문단 조항, 엑셀 한 칸 안 여러 문단, 문서 속 흐름도·차트 이미지, 글자 없는 스캔 PDF.</p>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">문서별 분류·변경률</h2>
+    <p class="muted">변경률 = 변경 조항 수 ÷ 전체 조항 수(신구 조항 합집합) × 100</p>
+    <div class="scroll"><table>
+      <thead><tr><th>문서</th><th>형식</th><th>문서유형(판정 = 기대)</th><th class="num">조항 구→신</th><th class="num">전체 조항</th><th class="num">변경</th><th class="num">변경률</th></tr></thead>
+      <tbody>
+        <tr><td>계약인수 사무처리기준</td><td><span class="fmt">txt</span></td><td>사무처리기준 <span class="pill ok">일치</span></td><td class="num">12→12</td><td class="num">13</td><td class="num">5</td><td class="num">38.5%</td></tr>
+        <tr><td>보험금지급심사 업무매뉴얼</td><td><span class="fmt">txt</span></td><td>업무매뉴얼 <span class="pill ok">일치</span></td><td class="num">10→10</td><td class="num">11</td><td class="num">5</td><td class="num">45.5%</td></tr>
+        <tr><td>심사업무운영 내규</td><td><span class="fmt">txt</span></td><td>내규 <span class="pill ok">일치</span></td><td class="num">10→10</td><td class="num">11</td><td class="num">5</td><td class="num">45.5%</td></tr>
+        <tr><td>언더라이팅 업무매뉴얼</td><td><span class="fmt">docx</span></td><td>업무매뉴얼 <span class="pill ok">일치</span></td><td class="num">28→30</td><td class="num">32</td><td class="num">16</td><td class="num">50.0%</td></tr>
+        <tr><td>보험금 지급 사무처리기준</td><td><span class="fmt">pdf</span></td><td>사무처리기준 <span class="pill ok">일치</span></td><td class="num">26→26</td><td class="num">29</td><td class="num">14</td><td class="num">48.3%</td></tr>
+        <tr><td>계약심사 전결 내규</td><td><span class="fmt">docx</span></td><td>내규 <span class="pill ok">일치</span></td><td class="num">24→25</td><td class="num">27</td><td class="num">12</td><td class="num">44.4%</td></tr>
+        <tr><td>보험계약 유지관리 업무매뉴얼</td><td><span class="fmt">pdf</span></td><td>업무매뉴얼 <span class="pill ok">일치</span></td><td class="num">22→23</td><td class="num">25</td><td class="num">11</td><td class="num">44.0%</td></tr>
+        <tr><td>모집질서 준수 내규</td><td><span class="fmt">docx</span></td><td>내규 <span class="pill ok">일치</span></td><td class="num">20→20</td><td class="num">22</td><td class="num">10</td><td class="num">45.5%</td></tr>
+        <tr><td>보험료 수납 사무처리기준</td><td><span class="fmt">xlsx</span></td><td>사무처리기준 <span class="pill ok">일치</span></td><td class="num">18→18</td><td class="num">20</td><td class="num">9</td><td class="num">45.0%</td></tr>
+        <tr><td>심사위원회 운영규정</td><td><span class="fmt">txt</span></td><td>내규 <span class="pill ok">일치</span></td><td class="num">16→17</td><td class="num">18</td><td class="num">8</td><td class="num">44.4%</td></tr>
+        <tr><td>회의록 샘플 (분류 불가 시험)</td><td><span class="fmt">txt</span></td><td>미분류 <span class="pill ok">일치</span></td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num">–</td></tr>
+        <tr><td>스캔본 예시 (글자 없는 PDF)</td><td><span class="fmt">pdf</span></td><td>업로드 제외·안내 <span class="pill ok">정상</span></td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num">–</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <div class="two">
+    <section aria-labelledby="s4">
+      <h2 id="s4">회귀 시험</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>점검</th><th class="num">항목</th><th>결과</th></tr></thead>
+        <tbody>
+          <tr><td>전체 버튼·기능 (탭, 비교, 내려받기, 알림, 집계, CSV, 업로드, 개인정보 차단)</td><td class="num">46</td><td><span class="pill ok">통과</span></td></tr>
+          <tr><td>변경대비표 필터·정리</td><td class="num">15</td><td><span class="pill ok">통과</span></td></tr>
+          <tr><td>비고 저장 버튼</td><td class="num">14</td><td><span class="pill ok">통과</span></td></tr>
+          <tr><td>최신 항목 상단 표시</td><td class="num">12</td><td><span class="pill ok">통과</span></td></tr>
+          <tr><td>PDF·엑셀 양식·이력 집계</td><td class="num">11</td><td><span class="pill ok">통과</span></td></tr>
+          <tr><td>저장 공간·복구 (대용량 업로드, 저장 실패 경고, 문서함에서 빼기)</td><td class="num">15</td><td><span class="pill ok">통과</span></td></tr>
+          <tr class="sum"><td>합계</td><td class="num">113</td><td>0건 실패</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted">개별 수정 확인(Mac 한글 파일명, Word 표 칸 비교, 조사 분리 강조)은 해당 파일을 직접 내려받아 확인. 추가로 화면·워드·엑셀에 표시되는 현행/개정 문구가 원문과 같은지 95건 전수 검사(불일치 0), 자동 비고 56건 문구 검토.</p>
+    </section>
+
+    <section aria-labelledby="s5">
+      <h2 id="s5">검증 방법</h2>
+      <ol>
+        <li>정답(기대값)은 앱과 따로 계산: 변경 정답표는 생성 스크립트의 변경 목록에서, 조항 수·변경률·알림 대상·집계는 <code>tools/make_expected_metrics.py</code>로 계산 (샘플은 원문 파일을 직접 읽어 셈).</li>
+        <li>시험용 자료 생성: 변경 목록(무엇을 어떻게 바꿨는지)에서 신구 문서와 정답표를 함께 만들어, 문서와 정답이 어긋나지 않게 함 (<code>tools/make_test_pack*.py</code>).</li>
+        <li>앱의 ‘기준 데이터’에 문서 메타·정답표 CSV를 올리고, 문서를 문서함에 한꺼번에 끌어다 놓음.</li>
+        <li>‘전체 신구 비교 실행’ 후 ‘정답 검증’ 탭의 건별 대조로 판정.</li>
+        <li>실행 환경: 운영과 같은 빌드(<code>public/index.html</code>)를 Chromium 브라우저에서 자동 조작.</li>
+      </ol>
+      <p class="muted">재현 자료: 저장소 <code>data/test_pack/</code>, <code>data/test_pack2/</code> (각 README에 넣는 순서). 앱: <a href="https://manual-update.vercel.app/" target="_blank" rel="noopener">manual-update.vercel.app</a></p>
+    </section>
+  </div>
+
+  <section aria-labelledby="s6">
+    <h2 id="s6">한계와 다음 단계</h2>
+    <ul>
+      <li><strong>시험 자료가 모두 가상 문서입니다.</strong> 같은 규칙으로 만든 문서라 실제 사내 문서보다 정형적입니다. 실제 문서 기준 정확도는 아직 확인하지 않았습니다.</li>
+      <li><strong>분류는 키워드 방식입니다.</strong> 제목·본문에 ‘사무처리’, ‘매뉴얼’, ‘내규’ 같은 말이 없으면 ‘미분류’가 됩니다. 키워드는 ‘기준 데이터’에서 CSV로 바꿀 수 있습니다.</li>
+      <li><strong>조항 번호를 새로 매긴 개정</strong>은 같은 조항이 ‘삭제 + 신설’로 잡힙니다.</li>
+      <li><strong>PDF는 만든 프로그램에 따라</strong> 줄바꿈·띄어쓰기가 다르게 읽힐 수 있고, 스캔 이미지 PDF는 읽지 못합니다.</li>
+      <li><strong>작업 내용은 각 브라우저에만</strong> 저장됩니다. 저장 공간이 부족하면 화면 위에 경고가 뜹니다(대용량 파일 10개 업로드 후 새로고침해도 유지 확인).</li>
+      <li><strong>알림은 화면 안에만</strong> 쌓이며 각 사용자 브라우저에 저장됩니다(실제 발송 없음, 기획서 범위).</li>
+      <li><strong>자동 비고는 문구 차이 요약</strong>입니다. ‘현금 지급 폐지’처럼 뜻을 요약하지는 않으므로 필요한 곳은 담당자가 고쳐 저장합니다.</li>
+    </ul>
+    <p><strong>다음 단계:</strong> 실제 개정된 사내 문서 1~2쌍으로 담당자 수작업 대비표와 앱 결과를 대조하고(누락·오분류 건수), 같은 건의 작성 시간을 비교해 기획서 판정 기준(정확도 90% 이상, 소요 시간 50% 이상 단축)을 확인합니다.</p>
+  </section>
+
+  <footer>작성: Claude Code · 기준 버전 main(PR #22 병합본) · 모든 데이터는 가상입니다.</footer>
+</div>

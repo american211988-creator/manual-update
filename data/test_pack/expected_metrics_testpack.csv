@@ -1,0 +1,4 @@
+﻿doc_id,doc_title,doc_type,old_version,new_version,effective_month,articles_old,articles_new,articles_total,changes,revised,added,deleted,change_rate,subscribers
+DOC-101,언더라이팅 업무매뉴얼,업무매뉴얼,v3.0,v4.0,2026-10,28,30,32,16,10,4,2,50.0,U02|U03|U05
+DOC-102,보험금 지급 사무처리기준,사무처리기준,v2.1,v3.0,2026-10,26,26,29,14,8,3,3,48.3,U01|U04|U05
+DOC-103,계약심사 전결 내규,내규,v1.5,v2.0,2026-10,24,25,27,12,7,3,2,44.4,U01|U03|U05
