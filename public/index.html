@@ -15,7 +15,7 @@
     --accent: #2F6BEA; --accent-weak: #DCE6FB; --on-accent: #FFFFFF;
     --rev: #7A5A00; --rev-bg: #FAEB9A; --new: #1D7A3B; --new-bg: #D3EFD9; --del: #B23A26; --del-bg: #F9DCD3;
     --k-white: #FBF9F4; --k-pink: #F3DCD8; --k-lilac: #E7D7EF; --k-peach: #F5D6C0; --k-coral: #F2A08C; --k-blue: #CFDDFB;
-    --lcd: #2B2A27; --lcd-fg: #ECE8DF; --lcd-dim: #A9A398; --led: #22C55E; --ring: #5B4BE0;
+    --lcd: #F8F4EC; --lcd-fg: #2A2724; --lcd-dim: #7A7368; --led: #179A48; --ring: #5B4BE0;
     --cap-shadow: rgba(42, 39, 36, 0.16);
   --font-display: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
@@ -29,7 +29,7 @@
     --accent: #7FA4FF; --accent-weak: #1F2A44; --on-accent: #10131A;
     --rev: #F2D24B; --rev-bg: #3A3212; --new: #63D486; --new-bg: #15301E; --del: #FF9C86; --del-bg: #3D1E18;
     --k-white: #2C2A26; --k-pink: #43302D; --k-lilac: #3A3044; --k-peach: #45362A; --k-coral: #5A3127; --k-blue: #22304D;
-    --lcd: #0F0F0E; --lcd-fg: #ECE8DF; --lcd-dim: #8F897F; --led: #3BE07A; --ring: #8C80FF;
+    --lcd: #2E2B27; --lcd-fg: #EDE8DF; --lcd-dim: #A39B8F; --led: #3BE07A; --ring: #8C80FF;
     --cap-shadow: rgba(0, 0, 0, 0.45);
     color-scheme: dark;
   }
@@ -39,7 +39,7 @@
     --accent: #7FA4FF; --accent-weak: #1F2A44; --on-accent: #10131A;
     --rev: #F2D24B; --rev-bg: #3A3212; --new: #63D486; --new-bg: #15301E; --del: #FF9C86; --del-bg: #3D1E18;
     --k-white: #2C2A26; --k-pink: #43302D; --k-lilac: #3A3044; --k-peach: #45362A; --k-coral: #5A3127; --k-blue: #22304D;
-    --lcd: #0F0F0E; --lcd-fg: #ECE8DF; --lcd-dim: #8F897F; --led: #3BE07A; --ring: #8C80FF;
+    --lcd: #2E2B27; --lcd-fg: #EDE8DF; --lcd-dim: #A39B8F; --led: #3BE07A; --ring: #8C80FF;
     --cap-shadow: rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
@@ -164,7 +164,7 @@ h1, h2 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.
 h2 { font-size: 1.12rem; }
 .wrap { gap: 18px; padding-block: 24px 56px; }
 
-.lcd { background: var(--lcd); color: var(--lcd-fg); border-radius: 18px; padding: 16px 20px 12px; display: grid; gap: 6px; box-shadow: inset 0 2px 10px rgba(0,0,0,.45), 0 0 0 6px var(--k-white), 0 0 0 7.5px var(--line); margin: 8px 8px 6px; }
+.lcd { background: var(--lcd); color: var(--lcd-fg); border-radius: 18px; padding: 16px 20px 12px; display: grid; gap: 6px; box-shadow: inset 0 2px 6px var(--cap-shadow), 0 0 0 1.5px var(--line), 0 0 0 6px var(--k-white), 0 0 0 7.5px var(--line); margin: 8px 8px 6px; }
 .lcd h1 { font-size: clamp(1.35rem, 3.2vw, 1.9rem); line-height: 1.25; color: var(--lcd-fg); }
 .lcd-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: var(--font-lcd); font-size: 1.15rem; letter-spacing: 0.06em; color: var(--lcd-dim); }
 .lcd-org { text-transform: uppercase; }
