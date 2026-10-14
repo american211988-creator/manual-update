@@ -431,7 +431,9 @@ function restore() {
     if (!d) return false;
     Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
     ["users", "keywords", "expected", "docsMeta", "history"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
-    const up = d.library || [], upNames = new Set(up.map(f => f.name));
+    const nfc = v => String(v ?? "").normalize("NFC");
+    (d.runs || []).forEach(r => { r.oldName = nfc(r.oldName); r.newName = nfc(r.newName); r.title = nfc(r.title); });
+    const up = (d.library || []).map(f => ({ ...f, name: nfc(f.name), text: nfc(f.text) })), upNames = new Set(up.map(f => f.name));
     state.library = SAMPLE.files.filter(f => !upNames.has(f.name)).map(f => ({ ...f, uploaded: false })).concat(up);
     return state.runs.length > 0;
   } catch (e) { return false; }
@@ -874,7 +876,7 @@ function copyText(s) {
 $("#copyBtn").onclick = () => {
   const d = currentRows(); if (!d) return toast("먼저 문서를 비교하세요");
   const cell = v => /[\t\n"]/.test(v) ? '"' + String(v).replace(/"/g, '""') + '"' : v;
-  copyText([d.head, ...d.rows].map(r => r.map(cell).join("\t")).join("\n"));
+  copyText([d.head, ...d.rows].map(r => r.map(cell).join("\t")).join("\n").normalize("NFC"));
 };
 /* 엑셀: 받은 양식(changes_template.xlsx)의 서식(styles·theme·열 너비)을 그대로 쓰고 내용만 채운다.
    양식의 셀 서식 번호 — 1: 제목(굵게 14pt, 가운데, A1:E1 병합) / 2: 머리글(굵은 흰 글씨, 칠, 테두리) / 3: 본문(테두리, 위 정렬, 줄바꿈) */
@@ -947,7 +949,7 @@ function zipStore(files, type) {   // 압축 없이(stored) 묶는 최소 ZIP �
   return new Blob([...parts, ...central, new Uint8Array(e.buffer)], { type });
 }
 
-const xe = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const xe = s => String(s ?? "").normalize("NFC").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const TYPE_COLOR = { 개정: "8F5B00", 신설: "1C7343", 삭제: "AE2A20" };
 function wRun(text, o = {}) {
   const pr = (o.b ? "<w:b/>" : "") + (o.strike ? "<w:strike/>" : "") + (o.u ? '<w:u w:val="single"/>' : "") +
@@ -1074,7 +1076,8 @@ async function addFiles(files) {
   const ready = [], skipped = [];
   for (const f of files) {
     if (!/\.(txt|docx|pdf)$/i.test(f.name)) { skipped.push(`${f.name}: .txt, .docx, .pdf만 올릴 수 있습니다`); continue; }
-    try { ready.push({ name: f.name, text: await readFile(f) }); }
+    // Mac은 한글 파일 이름을 자모로 풀어(NFD) 넘기므로 완성형(NFC)으로 맞춘다
+    try { ready.push({ name: f.name.normalize("NFC"), text: (await readFile(f)).normalize("NFC") }); }
     catch (e) { skipped.push(`${f.name}: ${e.message}`); }
   }
   // 여러 파일을 한꺼번에 올려도 제외된 파일 안내가 덮이지 않게 한 문구로 합친다
@@ -1111,7 +1114,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") $("#piiModal
 const csvTargets = { csvUsers: ["users", "user_id"], csvKeywords: ["keywords", "keyword"], csvExpected: ["expected", "change_id"], csvDocs: ["docsMeta", "doc_id"], csvHistory: ["history", "month"] };
 Object.entries(csvTargets).forEach(([id, [key, must]]) => $("#" + id).onchange = async e => {
   const f = e.target.files[0]; e.target.value = ""; if (!f) return;
-  const text = await readFile(f);
+  const text = (await readFile(f)).normalize("NFC");
   if (blockIfPII("CSV 업로드", [{ source: f.name, findings: scanPII(text, { allowEmail: key === "users" }) }])) return;
   const rows = parseCSV(text);
   if (!rows.length || !(must in rows[0])) return toast(`${f.name}: '${must}' 컬럼이 있는 CSV가 필요합니다`);
