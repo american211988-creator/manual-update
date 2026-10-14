@@ -157,6 +157,15 @@ table.hist td.zero { color: var(--muted); }
 table.hist td.month { font-family: var(--font-data); font-weight: 500; white-space: nowrap; }
 table.hist tr.first td { border-top: 1.5px solid var(--line); }
 table.hist tr.sum td { font-weight: 700; background: var(--paper); }
+.vtiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.vtile { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 2px; background: var(--surface); }
+.vtile.ok { border-color: var(--new); } .vtile.bad { border-color: var(--del); }
+.vtile b { font: 600 1.35rem/1.1 var(--font-data); font-variant-numeric: tabular-nums; }
+.vtile .sub { font-size: 0.78rem; color: var(--muted); }
+.vsets { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+details.vdet { border-top: 1px solid var(--line); padding-top: 8px; }
+details.vdet summary { cursor: pointer; font-weight: 600; font-size: 0.92rem; }
+details.vdet[open] summary { margin-bottom: 8px; }
 .check { display: inline-flex; gap: 6px; align-items: center; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
 .calc { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
 .calc label { display: grid; gap: 4px; font-size: 0.82rem; color: var(--muted); }
@@ -212,6 +221,7 @@ nav.tabs button[data-tab="ref"][aria-selected="true"] { background: var(--new-bg
 .badge { background: var(--led); color: #0B2615; border-radius: 9px; }
 
 button.btn, label.btn { background: var(--k-white); padding: 7px 14px; }
+a.btn { text-decoration: none; background: var(--k-white); color: var(--ink); border: 1.5px solid var(--ink); border-radius: 10px; box-shadow: inset 0 -3px 0 var(--cap-shadow), 0 2px 0 var(--ink); display: inline-flex; align-items: center; font: 500 0.8rem var(--font-body); padding: 3px 10px; }
 button.btn:hover, label.btn:hover { border-color: var(--ink); background: var(--surface); }
 button.btn.primary { background: var(--accent); border-color: var(--ink); color: var(--on-accent); font-weight: 600; }
 .runs button { background: var(--k-white); padding: 6px 12px; }
@@ -305,6 +315,7 @@ select, input[type=number], input[type=text] { border-radius: 8px; border-width:
 
   <!-- 3. 정답 검증 -->
   <section class="panel" id="tab-verify" hidden>
+    <div id="vsetBody"></div>
     <div id="verifyBody"></div>
   </section>
 
@@ -441,7 +452,7 @@ const state = {
   library: [],      // {name, text, uploaded}
   runs: [],         // 비교 결과
   notices: [],      // 알림
-  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null, noteDrafts: {}, confirmRemove: null, storageError: false,
+  currentRun: null, currentMsg: null, userFilter: "all", tab: "library", history: [], showHistory: true, runFilter: { type: "all", month: "all" }, showAllRuns: false, confirmDelete: null, noteDrafts: {}, confirmRemove: null, storageError: false, verifyLog: [], vsetRunning: false, vsetSel: { sample: true, pack1: true, pack2: true }, vsetOpen: null,
 };
 function loadRef() {
   state.docsMeta = parseCSV(SAMPLE.csv.documents);
@@ -479,7 +490,7 @@ const idbSet = (k, v) => idbReq("readwrite", st => st.put(v, k));
 function snapshot() {
   return {
     savedAt: Date.now(), library: state.library.filter(f => f.uploaded), runs: state.runs, notices: state.notices,
-    users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta, history: state.history,
+    users: state.users, keywords: state.keywords, expected: state.expected, docsMeta: state.docsMeta, history: state.history, verifyLog: state.verifyLog,
   };
 }
 let saveTimer = null, lsOk = true;
@@ -517,7 +528,7 @@ function restore(d) {
   try {
     if (!d) return false;
     Object.assign(state, { runs: d.runs || [], notices: d.notices || [] });
-    ["users", "keywords", "expected", "docsMeta", "history"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
+    ["users", "keywords", "expected", "docsMeta", "history", "verifyLog"].forEach(k => { if (d[k]?.length) state[k] = d[k]; });
     const nfc = v => String(v ?? "").normalize("NFC");
     (d.runs || []).forEach(r => { r.oldName = nfc(r.oldName); r.newName = nfc(r.newName); r.title = nfc(r.title); });
     const up = (d.library || []).map(f => ({ ...f, name: nfc(f.name), text: nfc(f.text) })), upNames = new Set(up.map(f => f.name));
@@ -1035,10 +1046,145 @@ function renderUnified(runs) {
     </table></div></div>`;
 }
 
+/* ---------- 운영 검증 실행: 내장 샘플 + 운영에 함께 올린 시험 자료(testdata/)로 분류·변경 비교·알림·집계·변경률을 정답과 대조 ----------
+   사용자의 문서함·비교 결과·알림은 건드리지 않는다 (잠시 바꿔 계산한 뒤 원래대로 되돌린다). 결과는 검증 기록으로 남는다. */
+const VSET_SAMPLE = { key: "sample", label: "기본 샘플" };
+let vManifest = null;
+async function vsetList() {
+  if (!vManifest) {
+    try { const r = await fetch("testdata/manifest.json", { cache: "no-store" }); vManifest = r.ok ? (await r.json()).sets || [] : []; }
+    catch (e) { vManifest = []; }
+  }
+  return [VSET_SAMPLE, ...vManifest];
+}
+async function loadVset(set) {
+  if (set.key === "sample") return {
+    files: SAMPLE.files.map(f => ({ ...f, set: set.label })), meta: parseCSV(SAMPLE.csv.documents),
+    expected: parseCSV(SAMPLE.csv.expected_changes), metrics: parseCSV(SAMPLE.csv.expected_metrics || ""), readErrors: [],
+  };
+  const get = async n => { const r = await fetch(set.dir + encodeURIComponent(n), { cache: "no-store" }); if (!r.ok) throw new Error(`${n}: 불러오지 못했습니다 (${r.status})`); return r; };
+  const csvOf = async n => parseCSV((await (await get(n)).text()).normalize("NFC"));
+  const files = [], readErrors = [];
+  for (const n of set.files) {
+    try { const blob = await (await get(n)).blob(); files.push({ name: n.normalize("NFC"), text: (await readFile(new File([blob], n))).normalize("NFC"), set: set.label }); }
+    catch (e) { readErrors.push({ name: n, set: set.label, msg: e.message }); }
+  }
+  return { files, meta: await csvOf(set.meta), expected: await csvOf(set.expected), metrics: await csvOf(set.metrics), readErrors };
+}
+async function runVerification(keys) {
+  const all = (await vsetList()).filter(s => keys.includes(s.key));
+  const loaded = [];
+  for (const s of all) loaded.push({ set: s, ...(await loadVset(s)) });
+  const uniq = (list, k) => [...new Map(list.map(x => [x[k], x])).values()];
+  const files = uniq(loaded.flatMap(l => l.files), "name"), meta = uniq(loaded.flatMap(l => l.meta), "file_name");
+  const expected = loaded.flatMap(l => l.expected), metrics = uniq(loaded.flatMap(l => l.metrics), "doc_id"), readErrors = loaded.flatMap(l => l.readErrors);
+  const keep = ["library", "docsMeta", "runs", "notices", "noteDrafts", "expected", "users", "keywords"];
+  const saved = Object.fromEntries(keep.map(k => [k, state[k]]));
+  try {
+    Object.assign(state, { library: files.map(f => ({ ...f, uploaded: true })), docsMeta: meta, runs: [], notices: [], noteDrafts: {}, expected,
+      users: parseCSV(SAMPLE.csv.users), keywords: parseCSV(SAMPLE.csv.classification_keywords) });
+    const groups = groupLibrary();
+    runGroups(groups.filter(g => g.length >= 2));
+    // 1) 파일 읽기: 글자 없는 스캔본은 '제외 안내'가 정답
+    const read = [...files.map(f => ({ name: f.name, set: f.set, ok: true, msg: "읽음" })),
+      ...readErrors.map(e => ({ name: e.name, set: e.set, ok: /스캔/.test(e.name) && /글자를 읽을 수 없는/.test(e.msg), msg: e.msg }))];
+    // 2) 분류: 문서 메타의 문서유형이 정답, 메타에 없는 문서는 '미분류'가 정답
+    const cls = files.map(f => { const d = parseDoc(f), m = meta.find(x => x.file_name === f.name), want = m ? m.doc_type : "미분류"; return { name: f.name, set: f.set, got: d.cls.type, want, ok: d.cls.type === want }; });
+    // 3) 변경 비교: 정답표 건별 대조 (조항·유형·현행·개정 문구)
+    const v = verify();
+    // 4) 알림·5) 변경률: 문서마다 기대값과 비교
+    const per = metrics.map(m => {
+      const r = state.runs.find(x => x.docId === m.doc_id);
+      const got = r ? [...new Set(state.notices.filter(n => n.runId === r.id).map(n => n.userId))].sort().join("|") : "";
+      const want = (m.subscribers || "").split("|").filter(Boolean).sort().join("|");
+      const rate = r ? (r.changes.length / (r.total || 1) * 100).toFixed(1) : "";
+      return { doc: m.doc_title, id: m.doc_id, alertGot: got, alertWant: want, alertOk: !!r && got === want,
+        total: r?.total, totalWant: +m.articles_total, n: r?.changes.length, nWant: +m.changes, rate, rateWant: m.change_rate,
+        rateOk: !!r && r.total === +m.articles_total && r.changes.length === +m.changes && rate === m.change_rate };
+    });
+    // 6) 월·연 집계: 시행월·연도별 개정/신설/삭제 건수
+    const bucket = (rows, key) => rows.reduce((acc, x) => { const k = key(x); acc[k] ||= { 개정: 0, 신설: 0, 삭제: 0 }; TYPES.forEach(t => acc[k][t] += x[t]); return acc; }, {});
+    const gotRows = state.runs.map(r => ({ month: r.eff.slice(0, 7), ...counts(r.changes) }));
+    const wantRows = metrics.map(m => ({ month: m.effective_month, 개정: +m.revised, 신설: +m.added, 삭제: +m.deleted }));
+    const agg = [];
+    for (const [label, key] of [["월", x => x.month], ["연", x => x.month.slice(0, 4)]]) {
+      const g = bucket(gotRows, key), w = bucket(wantRows, key);
+      for (const k of [...new Set([...Object.keys(g), ...Object.keys(w)])].sort()) {
+        const fmt = c => c ? `${c.개정}·${c.신설}·${c.삭제}` : "–";
+        agg.push({ kind: label, key: k, got: fmt(g[k]), want: fmt(w[k]), ok: fmt(g[k]) === fmt(w[k]) });
+      }
+    }
+    const score = list => ({ ok: list.filter(x => x).length, n: list.length });
+    const res = {
+      at: nowStr(), build: SAMPLE.build || "", sets: all.map(s => s.label),
+      scores: { read: score(read.map(x => x.ok)), cls: score(cls.map(x => x.ok)), change: { ok: v.ok, n: v.exp, det: v.det },
+        alert: score(per.map(x => x.alertOk)), rate: score(per.map(x => x.rateOk)), agg: score(agg.map(x => x.ok)) },
+      read, cls, changeRows: v.rows.filter(r => r.status !== "일치"), per, agg,
+    };
+    res.pass = Object.values(res.scores).every(sc => sc.n > 0 && sc.ok === sc.n) && res.scores.change.det === res.scores.change.n;
+    return res;
+  } finally { Object.assign(state, saved); }
+}
+async function renderVsets() {
+  const el = $("#vsetBody"); if (!el) return;
+  const sets = await vsetList();
+  const last = state.verifyLog[0];
+  const tile = (label, sc, sub) => `<div class="vtile ${sc.ok === sc.n && sc.n ? "ok" : "bad"}"><span class="eyebrow">${label}</span><b>${sc.ok} / ${sc.n}</b><span class="sub">${sub}</span></div>`;
+  const pill = ok => `<span class="stamp ${ok ? "t-ok" : "t-bad"}">${ok ? "일치" : "불일치"}</span>`;
+  el.innerHTML = `<div class="box">
+    <div class="bar"><div><h2>운영 검증 실행</h2><span class="muted">운영에 함께 올린 시험 자료로 분류·변경 비교·알림·집계·변경률을 정답과 대조합니다. 지금 작업 중인 문서와 결과는 바뀌지 않습니다.</span></div>
+      <div><a class="btn small" href="report.html" target="_blank" rel="noopener">검증 리포트</a></div></div>
+    <div class="vsets">${sets.map(s => `<label class="check" for="vs-${s.key}"><input type="checkbox" id="vs-${s.key}" data-vs="${s.key}" ${state.vsetSel[s.key] !== false ? "checked" : ""}>${esc(s.label)}${s.files ? ` (${s.files.length}개 파일)` : " (내장 3쌍)"}</label>`).join("")}
+      <button class="btn primary" id="vsetRun" ${state.vsetRunning ? "disabled" : ""}>${state.vsetRunning ? "검증 중…" : "검증 실행"}</button>
+      ${sets.length === 1 ? `<span class="muted">시험 자료를 찾지 못해 기본 샘플만 검증할 수 있습니다 (운영 사이트에서 열면 1·2차 자료도 쓸 수 있습니다).</span>` : ""}</div>
+    ${last ? `<div class="bar"><div><h3>최근 검증 결과</h3><span class="muted">${esc(last.at)} · ${esc(last.sets.join(", "))}${last.build ? ` · 앱 빌드 ${esc(last.build)}` : ""}</span></div>
+        <div><span class="stamp ${last.pass ? "t-ok" : "t-bad"}" style="font-size:0.9rem;padding:3px 12px">${last.pass ? "전체 통과" : "불일치 있음"}</span></div></div>
+      <div class="vtiles">
+        ${tile("파일 읽기", last.scores.read, "스캔본 제외 안내 포함")}
+        ${tile("문서유형 분류", last.scores.cls, "메타의 문서유형 · 미분류")}
+        ${tile("변경 비교", last.scores.change, `정답표 건별 · 감지 ${last.scores.change.det}건`)}
+        ${tile("알림 대상", last.scores.alert, "구독 담당자 = 알림 받은 담당자")}
+        ${tile("변경률", last.scores.rate, "전체 조항·변경 건수·비율")}
+        ${tile("월·연 집계", last.scores.agg, "개정·신설·삭제 건수")}
+      </div>
+      <details class="vdet" ${state.vsetOpen === "cls" ? "open" : ""} data-open="cls"><summary>파일 읽기·분류 상세 (${last.cls.length + last.read.filter(r => !r.ok || r.msg !== "읽음").length}건)</summary><div class="scroll"><table>
+        <thead><tr><th>자료</th><th>파일</th><th>판정</th><th>정답</th><th>결과</th></tr></thead>
+        <tbody>${last.cls.map(c => `<tr><td>${esc(c.set)}</td><td class="mono">${esc(c.name)}</td><td>${esc(c.got)}</td><td>${esc(c.want)}</td><td>${pill(c.ok)}</td></tr>`).join("")}
+          ${last.read.filter(r => r.msg !== "읽음").map(r => `<tr><td>${esc(r.set)}</td><td class="mono">${esc(r.name)}</td><td colspan="2">${esc(r.msg)}</td><td>${r.ok ? `<span class="stamp t-ok">제외 정상</span>` : pill(false)}</td></tr>`).join("")}</tbody></table></div></details>
+      <details class="vdet" ${state.vsetOpen === "per" ? "open" : ""} data-open="per"><summary>문서별 알림·변경률 상세 (${last.per.length}건)</summary><div class="scroll"><table>
+        <thead><tr><th>문서</th><th>알림 대상 (앱 / 정답)</th><th></th><th class="num">전체 조항</th><th class="num">변경</th><th class="num">변경률 (앱 / 정답)</th><th></th></tr></thead>
+        <tbody>${last.per.map(x => `<tr><td>${esc(x.doc)} <span class="muted mono">${esc(x.id)}</span></td><td class="mono">${esc(x.alertGot || "–")} / ${esc(x.alertWant)}</td><td>${pill(x.alertOk)}</td>
+          <td class="num">${x.total ?? "–"} / ${x.totalWant}</td><td class="num">${x.n ?? "–"} / ${x.nWant}</td><td class="num">${x.rate || "–"}% / ${esc(x.rateWant)}%</td><td>${pill(x.rateOk)}</td></tr>`).join("")}</tbody></table></div></details>
+      <details class="vdet" ${state.vsetOpen === "agg" ? "open" : ""} data-open="agg"><summary>월·연 집계 상세 (${last.agg.length}건)</summary><div class="scroll"><table>
+        <thead><tr><th>구분</th><th>기간</th><th>앱 (개정·신설·삭제)</th><th>정답</th><th></th></tr></thead>
+        <tbody>${last.agg.map(a => `<tr><td>${a.kind}</td><td class="mono">${esc(a.key)}</td><td class="mono">${a.got}</td><td class="mono">${a.want}</td><td>${pill(a.ok)}</td></tr>`).join("")}</tbody></table></div></details>
+      ${last.changeRows.length ? `<details class="vdet" open><summary>변경 비교 불일치 (${last.changeRows.length}건)</summary><div class="scroll"><table><thead><tr><th>문서</th><th>조항</th><th>판정</th></tr></thead>
+        <tbody>${last.changeRows.map(r => `<tr><td>${esc(r.doc)}</td><td>${esc(r.section)}</td><td>${esc(r.status)}</td></tr>`).join("")}</tbody></table></div></details>` : ""}
+      ${state.verifyLog.length > 1 ? `<details class="vdet"><summary>검증 기록 (${state.verifyLog.length}회)</summary><div class="scroll"><table>
+        <thead><tr><th>검증 시각</th><th>자료</th><th>앱 빌드</th><th>읽기</th><th>분류</th><th>변경</th><th>알림</th><th>변경률</th><th>집계</th><th>결과</th></tr></thead>
+        <tbody>${state.verifyLog.map(l => `<tr><td class="mono">${esc(l.at)}</td><td>${esc(l.sets.join(", "))}</td><td class="mono">${esc(l.build || "–")}</td>${["read", "cls", "change", "alert", "rate", "agg"].map(k => `<td class="num">${l.scores[k].ok}/${l.scores[k].n}</td>`).join("")}<td>${l.pass ? `<span class="stamp t-ok">통과</span>` : `<span class="stamp t-bad">불일치</span>`}</td></tr>`).join("")}</tbody></table></div></details>` : ""}`
+    : `<p class="muted">아직 검증 기록이 없습니다. ‘검증 실행’을 누르면 정답과 대조한 결과가 여기에 쌓입니다.</p>`}
+  </div>`;
+  el.querySelectorAll("[data-vs]").forEach(c => c.onchange = () => { state.vsetSel[c.dataset.vs] = c.checked; });
+  el.querySelectorAll("details[data-open]").forEach(d => d.ontoggle = () => { if (d.open) state.vsetOpen = d.dataset.open; else if (state.vsetOpen === d.dataset.open) state.vsetOpen = null; });
+  $("#vsetRun").onclick = async () => {
+    const keys = sets.map(s => s.key).filter(k => state.vsetSel[k] !== false);
+    if (!keys.length) return toast("검증할 자료를 하나 이상 고르세요");
+    state.vsetRunning = true; renderVsets();
+    try {
+      const res = await runVerification(keys);
+      state.verifyLog = [res, ...state.verifyLog].slice(0, 30); save();
+      toast(res.pass ? "검증을 마쳤습니다 · 전체 통과" : "검증을 마쳤습니다 · 불일치 항목을 확인하세요");
+    } catch (e) { toast(`검증하지 못했습니다: ${e.message}`, 6000); }
+    finally { state.vsetRunning = false; renderVsets(); }
+  };
+}
 function renderVerify() {
+  renderVsets();
   const v = verify();
   const pass = v.recall >= 0.9;
   $("#verifyBody").innerHTML = `
+    <div class="bar"><div><h2>지금 작업 기준 정답 대조</h2><span class="muted">문서함에서 비교한 결과를 ‘기준 데이터’의 정답표와 대조합니다.</span></div></div>
     <div class="verdict">
       <div><span class="eyebrow">정확도 (정답 대비 일치)</span><div class="big">${pct(v.recall)}</div></div>
       <div><span class="eyebrow">정밀도 (감지 대비 일치)</span><div class="big">${pct(v.precision)}</div></div>
